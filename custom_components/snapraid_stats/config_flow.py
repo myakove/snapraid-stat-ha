@@ -41,7 +41,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_AUTH_TYPE, default=DEFAULT_AUTH_TYPE): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
         vol.Optional(CONF_PASSWORD): str,
-        vol.Optional(CONF_SSH_KEY): str,
+        vol.Optional(CONF_SSH_KEY): vol.All(str, vol.Length(max=8192)),
         vol.Required(CONF_SUDO_METHOD, default=DEFAULT_SUDO_METHOD): vol.In([
             SUDO_METHOD_PASSWORDLESS,
             SUDO_METHOD_PASSWORD,
@@ -312,7 +312,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(CONF_USERNAME, default=suggested_values[CONF_USERNAME]): str,
                 vol.Required(CONF_AUTH_TYPE, default=suggested_values[CONF_AUTH_TYPE]): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
                 vol.Optional(CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]): str,
-                vol.Optional(CONF_SSH_KEY, default=suggested_values[CONF_SSH_KEY]): str,
+                vol.Optional(CONF_SSH_KEY, default=suggested_values[CONF_SSH_KEY]): vol.All(str, vol.Length(max=8192)),
                 vol.Required(CONF_SUDO_METHOD, default=suggested_values[CONF_SUDO_METHOD]): vol.In([
                     SUDO_METHOD_PASSWORDLESS,
                     SUDO_METHOD_PASSWORD,

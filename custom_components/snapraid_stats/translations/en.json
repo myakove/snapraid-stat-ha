@@ -17,7 +17,7 @@
         "data_description": {
           "auth_type": "Choose between password or SSH key authentication",
           "password": "Required for password authentication",
-          "ssh_key": "Required for SSH key authentication (paste private key content)",
+          "ssh_key": "SSH private key content (starts with -----BEGIN, NOT the .pub file. Usually ~/.ssh/id_rsa or ~/.ssh/id_ed25519)",
           "sudo_method": "How to handle sudo commands for snapraid",
           "sudo_password": "Required for sudo password authentication",
           "port": "SSH port (default: 22)"
@@ -27,7 +27,7 @@
     "error": {
       "cannot_connect": "Failed to connect to the server",
       "invalid_auth": "Invalid authentication",
-      "invalid_ssh_key": "Invalid SSH private key format",
+      "invalid_ssh_key": "Invalid SSH private key format. Make sure you're using the private key (starts with -----BEGIN), not the public key (.pub file)",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
@@ -52,7 +52,7 @@
         "data_description": {
           "auth_type": "Choose between password or SSH key authentication",
           "password": "Required for password authentication",
-          "ssh_key": "Required for SSH key authentication (paste private key content)",
+          "ssh_key": "SSH private key content (starts with -----BEGIN, NOT the .pub file. Usually ~/.ssh/id_rsa or ~/.ssh/id_ed25519)",
           "sudo_method": "How to handle sudo commands for snapraid",
           "sudo_password": "Required for sudo password authentication",
           "port": "SSH port (default: 22)"
