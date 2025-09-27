@@ -53,8 +53,8 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
         self._attr_device_info = {
             "identifiers": {(DOMAIN, self._host)},
             "name": f"{self._device_name} ({self._host})",
-            "manufacturer": "Snapraid",
-            "model": "Stats Monitor",
+            "manufacturer": "Home Assistant Community",
+            "model": "SnapRaid Stats Integration",
             "sw_version": "Unknown",
         }
 
