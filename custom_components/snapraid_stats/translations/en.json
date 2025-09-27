@@ -7,14 +7,23 @@
         "data": {
           "host": "Host",
           "username": "Username",
+          "auth_type": "Authentication Type",
           "password": "Password",
+          "ssh_key": "SSH Private Key",
           "port": "Port"
+        },
+        "data_description": {
+          "auth_type": "Choose between password or SSH key authentication",
+          "password": "Required for password authentication",
+          "ssh_key": "Required for SSH key authentication (paste private key content)",
+          "port": "SSH port (default: 22)"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to the server",
       "invalid_auth": "Invalid authentication",
+      "invalid_ssh_key": "Invalid SSH private key format",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
@@ -29,8 +38,16 @@
         "data": {
           "host": "Host",
           "username": "Username",
+          "auth_type": "Authentication Type",
           "password": "Password",
+          "ssh_key": "SSH Private Key",
           "port": "Port"
+        },
+        "data_description": {
+          "auth_type": "Choose between password or SSH key authentication",
+          "password": "Required for password authentication",
+          "ssh_key": "Required for SSH key authentication (paste private key content)",
+          "port": "SSH port (default: 22)"
         }
       }
     }

@@ -7,10 +7,17 @@ CONF_HOST = "host"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_PORT = "port"
+CONF_AUTH_TYPE = "auth_type"
+CONF_SSH_KEY = "ssh_key"
+
+# Authentication types
+AUTH_TYPE_PASSWORD = "password"
+AUTH_TYPE_SSH_KEY = "ssh_key"
 
 # Default values
 DEFAULT_PORT = 22
 DEFAULT_SCAN_INTERVAL = 3600  # 1 hour in seconds
+DEFAULT_AUTH_TYPE = AUTH_TYPE_PASSWORD
 
 # Entity names
 SENSOR_NAME = "Snapraid Stats"

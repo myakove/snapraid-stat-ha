@@ -54,7 +54,9 @@ A Home Assistant custom integration that monitors Snapraid array statistics from
 4. Enter your server connection details:
    - **Host**: IP address or hostname of your snapraid server
    - **Username**: SSH username
-   - **Password**: SSH password
+   - **Authentication Type**: Choose between "Password" or "SSH Key"
+   - **Password**: SSH password (required for password authentication)
+   - **SSH Private Key**: SSH private key content (required for SSH key authentication)
    - **Port**: SSH port (default: 22)
 
 ### Reconfiguration
@@ -151,9 +153,15 @@ automation:
 - Verify network connectivity between Home Assistant and the target server
 
 #### "Invalid authentication" error
-- Check that the username and password are correct
-- Ensure the user has SSH access to the server
-- Verify that password authentication is enabled in SSH config
+- **For password authentication**:
+  - Check that the username and password are correct
+  - Ensure the user has SSH access to the server
+  - Verify that password authentication is enabled in SSH config
+- **For SSH key authentication**:
+  - Ensure the SSH key format is correct (copy entire key including headers)
+  - Verify the public key is installed on the server (`~/.ssh/authorized_keys`)
+  - Check that the private key matches the public key on the server
+  - Ensure SSH key authentication is enabled on the server
 
 #### "Command failed" errors
 - Ensure snapraid is installed on the target server
@@ -180,10 +188,38 @@ logger:
 - SSH credentials are stored securely in Home Assistant's encrypted storage
 - Uses paramiko library for secure SSH connections (no external dependencies)
 - SSH connections use proper timeout and error handling
-- Consider using SSH key authentication instead of passwords (future enhancement)
+- **SSH Key Authentication**: Supports RSA, Ed25519, ECDSA, and DSS key types for enhanced security
+- Password and SSH key authentication methods available
+- SSH keys are more secure than passwords and recommended for production use
 - Ensure your snapraid server has proper firewall rules
-- Use strong passwords for SSH access
+- Use strong passwords for SSH access or configure SSH key authentication
 - Regularly update both Home Assistant and the target server
+
+### Setting up SSH Key Authentication
+
+For enhanced security, you can use SSH key authentication:
+
+1. **Generate SSH Key Pair** (on your client machine):
+   ```bash
+   ssh-keygen -t ed25519 -C "snapraid-stats@homeassistant"
+   ```
+
+2. **Copy Public Key to Server**:
+   ```bash
+   ssh-copy-id -i ~/.ssh/id_ed25519.pub username@your-server-ip
+   ```
+
+3. **Get Private Key Content**:
+   ```bash
+   cat ~/.ssh/id_ed25519
+   ```
+
+4. **Configure Integration**:
+   - Set Authentication Type to "SSH Key"
+   - Paste the entire private key content (including `-----BEGIN` and `-----END` lines)
+   - Leave password field empty
+
+5. **Test Connection**: The integration will validate the SSH key during setup
 
 ## Contributing
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
+from io import StringIO
 from typing import Any
 
 import paramiko
@@ -14,7 +15,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DEFAULT_PORT, DOMAIN, SSH_TIMEOUT
+from .const import (
+    AUTH_TYPE_PASSWORD,
+    AUTH_TYPE_SSH_KEY,
+    CONF_AUTH_TYPE,
+    CONF_SSH_KEY,
+    DEFAULT_AUTH_TYPE,
+    DEFAULT_PORT,
+    DOMAIN,
+    SSH_TIMEOUT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +32,9 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_PASSWORD): str,
+        vol.Required(CONF_AUTH_TYPE, default=DEFAULT_AUTH_TYPE): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
+        vol.Optional(CONF_PASSWORD): str,
+        vol.Optional(CONF_SSH_KEY): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
     }
 )
@@ -35,8 +47,16 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """
     host = data[CONF_HOST]
     username = data[CONF_USERNAME]
-    password = data[CONF_PASSWORD]
+    auth_type = data.get(CONF_AUTH_TYPE, DEFAULT_AUTH_TYPE)
+    password = data.get(CONF_PASSWORD)
+    ssh_key = data.get(CONF_SSH_KEY)
     port = data[CONF_PORT]
+
+    # Validate authentication parameters
+    if auth_type == AUTH_TYPE_PASSWORD and not password:
+        raise Exception("Password is required for password authentication")
+    if auth_type == AUTH_TYPE_SSH_KEY and not ssh_key:
+        raise Exception("SSH key is required for SSH key authentication")
 
     # Test SSH connection using paramiko
     def _test_ssh_connection():
@@ -45,16 +65,37 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
+            # Prepare connection parameters
+            connect_kwargs = {
+                "hostname": host,
+                "port": port,
+                "username": username,
+                "timeout": SSH_TIMEOUT,
+                "allow_agent": False,
+                "look_for_keys": False,
+            }
+
+            if auth_type == AUTH_TYPE_PASSWORD:
+                connect_kwargs["password"] = password
+            elif auth_type == AUTH_TYPE_SSH_KEY:
+                # Parse SSH key
+                try:
+                    key_obj = paramiko.RSAKey.from_private_key(StringIO(ssh_key))
+                    connect_kwargs["pkey"] = key_obj
+                except Exception:
+                    try:
+                        key_obj = paramiko.Ed25519Key.from_private_key(StringIO(ssh_key))
+                        connect_kwargs["pkey"] = key_obj
+                    except Exception:
+                        try:
+                            key_obj = paramiko.ECDSAKey.from_private_key(StringIO(ssh_key))
+                            connect_kwargs["pkey"] = key_obj
+                        except Exception:
+                            key_obj = paramiko.DSSKey.from_private_key(StringIO(ssh_key))
+                            connect_kwargs["pkey"] = key_obj
+
             # Connect with timeout
-            client.connect(
-                hostname=host,
-                port=port,
-                username=username,
-                password=password,
-                timeout=SSH_TIMEOUT,
-                allow_agent=False,
-                look_for_keys=False,
-            )
+            client.connect(**connect_kwargs)
 
             # Test basic command
             stdin, stdout, stderr = client.exec_command("echo test", timeout=SSH_TIMEOUT)
@@ -171,7 +212,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         suggested_values = {
             CONF_HOST: self.config_entry.data.get(CONF_HOST, ""),
             CONF_USERNAME: self.config_entry.data.get(CONF_USERNAME, ""),
+            CONF_AUTH_TYPE: self.config_entry.data.get(CONF_AUTH_TYPE, DEFAULT_AUTH_TYPE),
             CONF_PASSWORD: self.config_entry.data.get(CONF_PASSWORD, ""),
+            CONF_SSH_KEY: self.config_entry.data.get(CONF_SSH_KEY, ""),
             CONF_PORT: self.config_entry.data.get(CONF_PORT, DEFAULT_PORT),
         }
 
@@ -179,7 +222,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             {
                 vol.Required(CONF_HOST, default=suggested_values[CONF_HOST]): str,
                 vol.Required(CONF_USERNAME, default=suggested_values[CONF_USERNAME]): str,
-                vol.Required(CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]): str,
+                vol.Required(CONF_AUTH_TYPE, default=suggested_values[CONF_AUTH_TYPE]): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
+                vol.Optional(CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]): str,
+                vol.Optional(CONF_SSH_KEY, default=suggested_values[CONF_SSH_KEY]): str,
                 vol.Optional(CONF_PORT, default=suggested_values[CONF_PORT]): int,
             }
         )

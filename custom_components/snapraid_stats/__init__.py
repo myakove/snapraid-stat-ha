@@ -5,6 +5,7 @@ import asyncio
 import logging
 import socket
 from datetime import timedelta
+from io import StringIO
 
 import paramiko
 from homeassistant.config_entries import ConfigEntry
@@ -13,6 +14,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    AUTH_TYPE_PASSWORD,
+    AUTH_TYPE_SSH_KEY,
+    CONF_AUTH_TYPE,
+    CONF_SSH_KEY,
+    DEFAULT_AUTH_TYPE,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     SNAPRAID_DIFF_CMD,
@@ -61,7 +67,9 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         self.host = entry.data[CONF_HOST]
         self.username = entry.data[CONF_USERNAME]
-        self.password = entry.data[CONF_PASSWORD]
+        self.auth_type = entry.data.get(CONF_AUTH_TYPE, DEFAULT_AUTH_TYPE)
+        self.password = entry.data.get(CONF_PASSWORD)
+        self.ssh_key = entry.data.get(CONF_SSH_KEY)
         self.port = entry.data[CONF_PORT]
 
         super().__init__(
@@ -130,16 +138,37 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
+                # Prepare connection parameters
+                connect_kwargs = {
+                    "hostname": self.host,
+                    "port": self.port,
+                    "username": self.username,
+                    "timeout": SSH_TIMEOUT,
+                    "allow_agent": False,
+                    "look_for_keys": False,
+                }
+
+                if self.auth_type == AUTH_TYPE_PASSWORD:
+                    connect_kwargs["password"] = self.password
+                elif self.auth_type == AUTH_TYPE_SSH_KEY:
+                    # Parse SSH key
+                    try:
+                        key_obj = paramiko.RSAKey.from_private_key(StringIO(self.ssh_key))
+                        connect_kwargs["pkey"] = key_obj
+                    except Exception:
+                        try:
+                            key_obj = paramiko.Ed25519Key.from_private_key(StringIO(self.ssh_key))
+                            connect_kwargs["pkey"] = key_obj
+                        except Exception:
+                            try:
+                                key_obj = paramiko.ECDSAKey.from_private_key(StringIO(self.ssh_key))
+                                connect_kwargs["pkey"] = key_obj
+                            except Exception:
+                                key_obj = paramiko.DSSKey.from_private_key(StringIO(self.ssh_key))
+                                connect_kwargs["pkey"] = key_obj
+
                 # Connect with timeout
-                client.connect(
-                    hostname=self.host,
-                    port=self.port,
-                    username=self.username,
-                    password=self.password,
-                    timeout=SSH_TIMEOUT,
-                    allow_agent=False,
-                    look_for_keys=False,
-                )
+                client.connect(**connect_kwargs)
 
                 # Execute command
                 stdin, stdout, stderr = client.exec_command(command, timeout=SSH_TIMEOUT * 2)
