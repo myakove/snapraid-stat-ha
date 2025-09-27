@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import socket
 from datetime import timedelta
 from io import StringIO
@@ -142,57 +143,27 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 diff_lines = diff_output.strip().splitlines()
                 _LOGGER.debug("Snapraid diff output has %d lines", len(diff_lines))
 
-                # Parse diff statistics - look for lines with numbers and keywords
+                # Use regex to match statistics pattern: whitespace + number + space + keyword
+                # Pattern matches: "     355067 equal", "      676 added", etc.
+                stats_pattern = re.compile(r'^\s*(\d+)\s+(equal|added|removed|updated|moved|copied|restored)$')
+
                 stats_dict = {
                     "equal": "0", "added": "0", "removed": "0", "updated": "0",
                     "moved": "0", "copied": "0", "restored": "0"
                 }
 
-                # Strategy: Look for the statistics summary at the end
-                # Statistics typically appear after all file operations
-                summary_started = False
-                skipped_lines = 0
-
-                # First pass: Find where statistics start (look for first number + keyword line)
-                for i, line in enumerate(diff_lines):
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        try:
-                            count = int(parts[0])
-                            keyword = parts[1].lower()
-                            if keyword in stats_dict:
-                                # Found start of statistics section
-                                summary_started = True
-                                _LOGGER.debug("Found statistics section starting at line %d: '%s'", i, line)
-                                break
-                        except (ValueError, IndexError):
-                            continue
-
-                # Second pass: Parse only the statistics section
+                matched_lines = 0
                 for line in diff_lines:
-                    line = line.strip()
-                    if not line:
-                        continue
+                    match = stats_pattern.match(line)
+                    if match:
+                        count = match.group(1)
+                        keyword = match.group(2)
+                        stats_dict[keyword] = count
+                        matched_lines += 1
+                        _LOGGER.debug("Regex matched: %s = %s", keyword, count)
 
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        try:
-                            count = int(parts[0])
-                            keyword = parts[1].lower()
-                            if keyword in stats_dict:
-                                stats_dict[keyword] = str(count)
-                                _LOGGER.debug("Found statistic %s: %d", keyword, count)
-                        except (ValueError, IndexError):
-                            skipped_lines += 1
-                            continue
-                    else:
-                        skipped_lines += 1
-
-                _LOGGER.debug("Processed %d lines, found statistics: %s", len(diff_lines), stats_dict)
+                _LOGGER.debug("Found %d statistics using regex from %d total lines: %s",
+                            matched_lines, len(diff_lines), stats_dict)
                 stats.update(stats_dict)
 
         except Exception as err:
