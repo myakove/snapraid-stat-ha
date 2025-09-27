@@ -14,6 +14,7 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNA
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, TimestampDataUpdateCoordinator, UpdateFailed
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_DEBUG_LOGGING,
@@ -89,6 +90,28 @@ async def _async_entry_updated(hass: HomeAssistant, config_entry: ConfigEntry) -
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old entity unique_ids to the current format to avoid orphan warnings."""
+    try:
+        registry = er.async_get(hass)
+        updated = False
+        for entity in list(registry.entities.values()):
+            if entity.platform != DOMAIN:
+                continue
+            # Old format likely missing the domain prefix
+            if entity.unique_id.endswith(f"_{SENSOR_UNIQUE_ID}") and not entity.unique_id.startswith(f"{DOMAIN}_"):
+                new_unique_id = f"{DOMAIN}_{entity.unique_id}"
+                registry.async_update_entity(entity.entity_id, new_unique_id=new_unique_id)
+                _LOGGER.info("Migrated entity unique_id from %s to %s", entity.unique_id, new_unique_id)
+                updated = True
+        if updated:
+            _LOGGER.info("Entity registry updated during migration")
+        return True
+    except Exception as err:
+        _LOGGER.warning("Migration step skipped due to error: %s", err)
+        return True
+
+
 class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
     """Class to manage fetching data from the Snapraid server."""
 
@@ -121,6 +144,12 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
             self._is_updating = True
             _LOGGER.debug("SNAPRAID STATS: Starting scheduled data update for %s (attempt after %d consecutive failures, interval: %ds)",
                          self.host, self._consecutive_failures, self.scan_interval)
+            # Notify listeners so entities can reflect Running state immediately
+            try:
+                self.async_update_listeners()
+            except Exception:
+                # Best effort; method exists on coordinator in HA core
+                pass
             result = await self._get_snapraid_stats()
             _LOGGER.debug("Data update successful for %s, got %d stats", self.host, len(result))
             # Reset failure counter on success

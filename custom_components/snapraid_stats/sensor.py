@@ -103,12 +103,22 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
             elif coordinator_version == "Unknown":
                 _LOGGER.debug("Coordinator version is still Unknown, not updating device info")
 
-        # Check if there are any errors in the snapraid output
-        errors = self.coordinator.data.get("errors", "")
-        if "No error detected." not in errors and errors:
-            return STATE_ERROR
+        # Check if there are any errors in the snapraid output (tolerant parsing)
+        errors_text = (self.coordinator.data.get("errors") or "").strip()
+        if errors_text:
+            lowered = errors_text.lower()
+            # Consider common variants as OK
+            if ("no error" in lowered) or ("no errors" in lowered):
+                return STATE_OK
+            # If the line mentions error(s) but not the "no" variants, treat as error
+            if "error" in lowered:
+                return STATE_ERROR
+        # Fall back to OK when we have data and no explicit error
 
         return STATE_OK
+
+
+    
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
