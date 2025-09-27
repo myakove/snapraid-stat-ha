@@ -42,8 +42,9 @@ A Home Assistant custom integration that monitors Snapraid array statistics from
 
 1. Download the latest release from the [releases page](https://github.com/myakove/snapraid-stat-ha/releases)
 2. Extract the contents
-3. Copy the `custom_components/snapraid_stats` folder to your Home Assistant `custom_components` directory
-4. Restart Home Assistant
+3. Create a `custom_components/snapraid_stats` directory in your Home Assistant configuration folder
+4. Copy all Python files (`__init__.py`, `config_flow.py`, `sensor.py`, `const.py`), `manifest.json`, and the `translations` folder to the `custom_components/snapraid_stats` directory
+5. Restart Home Assistant
 
 ## Configuration
 
