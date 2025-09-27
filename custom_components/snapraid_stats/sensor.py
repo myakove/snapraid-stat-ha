@@ -10,6 +10,7 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers import device_registry as dr
 
 from . import SnapraidStatsDataUpdateCoordinator
 from .const import CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME, DOMAIN, SENSOR_NAME, SENSOR_UNIQUE_ID, STATE_ERROR, STATE_OK, STATE_RUNNING, STATE_UNAVAILABLE
@@ -84,12 +85,21 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
 
             if coordinator_version != "Unknown" and current_version != coordinator_version:
                 _LOGGER.info("Updating device firmware version from %s to %s", current_version, coordinator_version)
+                # Update local attribute for immediate UI reflection on entity card
                 self._attr_device_info["sw_version"] = coordinator_version
-                # Force device registry update
+
+                # Persist version in the device registry so it shows under the device's Firmware
+                try:
+                    device_registry = dr.async_get(self.hass)
+                    device = device_registry.async_get_device(identifiers={(DOMAIN, self._host)})
+                    if device and device.sw_version != coordinator_version:
+                        device_registry.async_update_device(device.id, sw_version=coordinator_version)
+                        _LOGGER.debug("Device registry firmware updated to %s", coordinator_version)
+                except Exception as err:
+                    _LOGGER.warning("Failed to update device registry firmware version: %s", err)
+
+                # Write state to ensure UI updates promptly
                 self.async_write_ha_state()
-                # Also schedule a device registry update
-                if hasattr(self, 'registry_entry') and self.registry_entry:
-                    _LOGGER.debug("Scheduling device registry update")
             elif coordinator_version == "Unknown":
                 _LOGGER.debug("Coordinator version is still Unknown, not updating device info")
 

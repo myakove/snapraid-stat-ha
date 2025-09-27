@@ -13,6 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, TimestampDataUpdateCoordinator, UpdateFailed
+from homeassistant.exceptions import ConfigEntryNotReady
 
 from .const import (
     CONF_DEBUG_LOGGING,
@@ -44,7 +45,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug("SNAPRAID STATS: Setting up integration for %s", entry.data.get(CONF_HOST, "unknown"))
     coordinator = SnapraidStatsDataUpdateCoordinator(hass, entry)
 
-    await coordinator.async_config_entry_first_refresh()
+    # Optionally enable verbose logs if configured
+    try:
+        if entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING):
+            package_logger = logging.getLogger("custom_components.snapraid_stats")
+            package_logger.setLevel(logging.DEBUG)
+            _LOGGER.info("Debug logging enabled for snapraid_stats")
+    except Exception:  # best-effort; logging config can vary
+        pass
+
+    # Perform initial refresh but do not fail setup if it temporarily fails
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except ConfigEntryNotReady as err:
+        _LOGGER.warning("Initial data refresh failed: %s. Proceeding with setup; sensor will be Unavailable until next refresh.", err)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
