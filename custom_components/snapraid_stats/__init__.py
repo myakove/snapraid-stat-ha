@@ -114,23 +114,25 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                 # Get snapraid version if we haven't already
                 if self.snapraid_version is None:
                     try:
-                        version_output = await self._run_ssh_command("sudo snapraid --version")
-                        # Parse version from output like "snapraid v12.0 by Andrea Mazzoleni"
+                        version_output = await self._run_ssh_command("snapraid --version")
+                        if self.debug_logging:
+                            _LOGGER.debug("Snapraid version output: %s", version_output)
+
+                        # Parse version from output like "snapraid v12.4 by Andrea Mazzoleni"
+                        import re
                         for line in version_output.strip().splitlines():
-                            if "snapraid v" in line.lower():
-                                # Extract version number
-                                import re
-                                version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
-                                if version_match:
-                                    self.snapraid_version = version_match.group(1)
-                                    if self.debug_logging:
-                                        _LOGGER.debug("Detected snapraid version: %s", self.snapraid_version)
-                                    break
+                            version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
+                            if version_match:
+                                self.snapraid_version = version_match.group(1)
+                                if self.debug_logging:
+                                    _LOGGER.debug("Detected snapraid version: %s", self.snapraid_version)
+                                break
+
                         if self.snapraid_version is None:
+                            _LOGGER.warning("Could not parse snapraid version from: %s", version_output)
                             self.snapraid_version = "Unknown"
                     except Exception as ver_err:
-                        if self.debug_logging:
-                            _LOGGER.debug("Could not get snapraid version: %s", ver_err)
+                        _LOGGER.warning("Could not get snapraid version: %s", ver_err)
                         self.snapraid_version = "Unknown"
 
             except Exception as err:
