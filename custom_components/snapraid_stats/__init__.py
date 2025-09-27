@@ -101,6 +101,13 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
         stats = {}
 
         try:
+            # First check if snapraid is available
+            try:
+                await self._run_ssh_command("which snapraid")
+                _LOGGER.debug("Snapraid found on remote system")
+            except Exception as err:
+                _LOGGER.warning("Snapraid command may not be available: %s", err)
+
             # Get status information
             status_output = await self._run_ssh_command(SNAPRAID_STATUS_CMD)
             if status_output:
@@ -193,6 +200,7 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 client.connect(**connect_kwargs)
 
                 # Execute command with sudo handling
+                _LOGGER.debug("Executing SSH command: %s", command)
                 stdin, stdout, stderr = client.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
 
                 # Handle sudo password if needed
@@ -211,8 +219,11 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 stderr_data = stderr.read().decode().strip()
 
                 if exit_status != 0:
-                    _LOGGER.error("SSH command failed (exit code %d): %s", exit_status, stderr_data)
-                    raise Exception(f"SSH command failed: {stderr_data}")
+                    _LOGGER.error("SSH command '%s' failed (exit code %d)", command, exit_status)
+                    _LOGGER.error("STDOUT: %s", stdout_data)
+                    _LOGGER.error("STDERR: %s", stderr_data)
+                    error_msg = stderr_data if stderr_data else stdout_data
+                    raise Exception(f"SSH command failed (exit code {exit_status}): {error_msg}")
 
                 return stdout_data
 
