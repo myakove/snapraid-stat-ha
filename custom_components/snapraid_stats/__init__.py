@@ -112,6 +112,8 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
             status_output = await self._run_ssh_command(SNAPRAID_STATUS_CMD)
             if status_output:
                 status_lines = status_output.strip().splitlines()
+                _LOGGER.debug("Snapraid status output has %d lines", len(status_lines))
+
                 if len(status_lines) >= 5:
                     # Get the last 5 lines for status information
                     status_info = status_lines[-5:]
@@ -122,23 +124,46 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                         "rehash": status_info[3].strip(),
                         "errors": status_info[4].strip(),
                     })
+                    _LOGGER.debug("Parsed status info from last 5 lines")
+                else:
+                    _LOGGER.warning("Status output has only %d lines, expected at least 5", len(status_lines))
+                    # Provide default values
+                    stats.update({
+                        "sync_in_progress": "Unknown",
+                        "array_not_scrubbed": "Unknown",
+                        "file_with_zero_sub_second_timestamp": "Unknown",
+                        "rehash": "Unknown",
+                        "errors": "Unknown",
+                    })
 
             # Get diff information
             diff_output = await self._run_ssh_command(SNAPRAID_DIFF_CMD)
             if diff_output:
                 diff_lines = diff_output.strip().splitlines()
-                if len(diff_lines) >= 8:
-                    # Get the last 8 lines for diff information
-                    diff_info = diff_lines[-8:]
-                    stats.update({
-                        "equal": diff_info[0].split()[0].strip() if diff_info[0].split() else "0",
-                        "added": diff_info[1].split()[0].strip() if diff_info[1].split() else "0",
-                        "removed": diff_info[2].split()[0].strip() if diff_info[2].split() else "0",
-                        "updated": diff_info[3].split()[0].strip() if diff_info[3].split() else "0",
-                        "moved": diff_info[4].split()[0].strip() if diff_info[4].split() else "0",
-                        "copied": diff_info[5].split()[0].strip() if diff_info[5].split() else "0",
-                        "restored": diff_info[6].split()[0].strip() if diff_info[6].split() else "0",
-                    })
+                _LOGGER.debug("Snapraid diff output has %d lines", len(diff_lines))
+
+                # Parse diff statistics - look for lines with numbers and keywords
+                stats_dict = {
+                    "equal": "0", "added": "0", "removed": "0", "updated": "0",
+                    "moved": "0", "copied": "0", "restored": "0"
+                }
+
+                for line in diff_lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            count = int(parts[0])
+                            keyword = parts[1].lower()
+                            if keyword in stats_dict:
+                                stats_dict[keyword] = str(count)
+                                _LOGGER.debug("Found %s: %d", keyword, count)
+                        except (ValueError, IndexError):
+                            continue
+
+                stats.update(stats_dict)
 
         except Exception as err:
             _LOGGER.error("Error getting snapraid stats: %s", err)
