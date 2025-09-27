@@ -19,11 +19,13 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_DEBUG_LOGGING,
     CONF_DEVICE_NAME,
+    CONF_SCAN_INTERVAL,
     CONF_SUDO_METHOD,
     CONF_SUDO_PASSWORD,
     DEFAULT_DEBUG_LOGGING,
     DEFAULT_DEVICE_NAME,
     DEFAULT_PORT,
+    DEFAULT_SCAN_INTERVAL,
     DEFAULT_SUDO_METHOD,
     DOMAIN,
     SSH_COMMAND_TIMEOUT,
@@ -47,6 +49,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         ]),
         vol.Optional(CONF_SUDO_PASSWORD): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=300, max=86400)),
         vol.Optional(CONF_DEBUG_LOGGING, default=DEFAULT_DEBUG_LOGGING): bool,
         vol.Optional(CONF_DEVICE_NAME, default=DEFAULT_DEVICE_NAME): str,
     }
@@ -260,6 +263,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             CONF_SUDO_METHOD: self.config_entry.data.get(CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD),
             CONF_SUDO_PASSWORD: self.config_entry.data.get(CONF_SUDO_PASSWORD, ""),
             CONF_PORT: self.config_entry.data.get(CONF_PORT, DEFAULT_PORT),
+            CONF_SCAN_INTERVAL: self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
             CONF_DEBUG_LOGGING: self.config_entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING),
             CONF_DEVICE_NAME: self.config_entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME),
         }
@@ -276,6 +280,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ]),
                 vol.Optional(CONF_SUDO_PASSWORD, default=suggested_values[CONF_SUDO_PASSWORD]): str,
                 vol.Optional(CONF_PORT, default=suggested_values[CONF_PORT]): int,
+                vol.Optional(CONF_SCAN_INTERVAL, default=suggested_values[CONF_SCAN_INTERVAL]): vol.All(vol.Coerce(int), vol.Range(min=300, max=86400)),
                 vol.Optional(CONF_DEBUG_LOGGING, default=suggested_values[CONF_DEBUG_LOGGING]): bool,
                 vol.Optional(CONF_DEVICE_NAME, default=suggested_values[CONF_DEVICE_NAME]): str,
             }

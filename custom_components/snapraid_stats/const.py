@@ -11,6 +11,7 @@ CONF_SUDO_METHOD = "sudo_method"
 CONF_SUDO_PASSWORD = "sudo_password"
 CONF_DEBUG_LOGGING = "debug_logging"
 CONF_DEVICE_NAME = "device_name"
+CONF_SCAN_INTERVAL = "scan_interval"
 
 
 # Sudo methods

@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Time
 from .const import (
     CONF_DEBUG_LOGGING,
     CONF_DEVICE_NAME,
+    CONF_SCAN_INTERVAL,
     CONF_SUDO_METHOD,
     CONF_SUDO_PASSWORD,
     DEFAULT_DEBUG_LOGGING,
@@ -78,6 +79,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         self.sudo_method = entry.data.get(CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD)
         self.sudo_password = entry.data.get(CONF_SUDO_PASSWORD)
         self.port = entry.data[CONF_PORT]
+        self.scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         self.debug_logging = entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING)
         self.device_name = entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
 
@@ -85,7 +87,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
+            update_interval=timedelta(seconds=self.scan_interval),
         )
 
     async def _async_update_data(self) -> dict[str, str]:

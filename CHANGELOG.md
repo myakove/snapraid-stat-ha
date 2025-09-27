@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-09-27
+
+### Added
+- **New Feature**: Configurable scan interval (pull interval) in configuration
+- Scan interval range: 300 seconds (5 minutes) to 86400 seconds (24 hours)
+- Default scan interval remains 3600 seconds (1 hour)
+- Available in both initial setup and reconfiguration options
+
+### Changed
+- Coordinator now uses configurable scan interval instead of hardcoded value
+- More flexible polling frequency for different use cases
+
 ## [1.2.11] - 2025-09-27
 
 ### Fixed
