@@ -66,10 +66,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         registry = er.async_get(hass)
         host = entry.data.get(CONF_HOST)
         if host:
-            desired_uid = f"{DOMAIN}_{host}_{SENSOR_UNIQUE_ID}"
+            # Canonical unique_id since v1.3.19: f"{DOMAIN}_{host}"
+            desired_uid = f"{DOMAIN}_{host}"
             legacy_uids = [
-                f"{host}_{SENSOR_UNIQUE_ID}",
-                f"{SENSOR_UNIQUE_ID}_{host}",
+                f"{host}_snapraid_stats",
+                f"snapraid_stats_{host}",
+                f"{DOMAIN}_{host}_snapraid_stats",
             ]
             # Find current entity for this config entry provided by this integration
             for entity in list(registry.entities.values()):
@@ -77,9 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     continue
                 if entity.unique_id == desired_uid:
                     continue
-                if (entity.unique_id in legacy_uids) or (
-                    entity.unique_id.endswith(f"_{SENSOR_UNIQUE_ID}") and not entity.unique_id.startswith(f"{DOMAIN}_")
-                ):
+                if (entity.unique_id in legacy_uids) or (entity.unique_id.startswith(f"{DOMAIN}_{host}_")):
                     # If another entity already has the desired UID, remove the legacy one
                     existing_entity_id = registry.async_get_entity_id(entity.domain, DOMAIN, desired_uid)
                     if existing_entity_id:
@@ -130,25 +130,39 @@ async def _async_entry_updated(hass: HomeAssistant, config_entry: ConfigEntry) -
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Migrate old entity unique_ids to the current format to avoid orphan warnings."""
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Migrate config entry to the latest version and normalize unique_id for its entities."""
     try:
-        registry = er.async_get(hass)
-        updated = False
-        for entity in list(registry.entities.values()):
-            if entity.platform != DOMAIN:
-                continue
-            # Old format likely missing the domain prefix
-            if entity.unique_id.endswith(f"_{SENSOR_UNIQUE_ID}") and not entity.unique_id.startswith(f"{DOMAIN}_"):
-                new_unique_id = f"{DOMAIN}_{entity.unique_id}"
-                registry.async_update_entity(entity.entity_id, new_unique_id=new_unique_id)
-                _LOGGER.info("Migrated entity unique_id from %s to %s", entity.unique_id, new_unique_id)
-                updated = True
-        if updated:
-            _LOGGER.info("Entity registry updated during migration")
+        # Canonical unique_id since v2: f"{DOMAIN}_{host}"
+        if getattr(config_entry, "version", 1) < 2:
+            host = config_entry.data.get(CONF_HOST)
+            if host:
+                desired_uid = f"{DOMAIN}_{host}"
+                registry = er.async_get(hass)
+                for entity in list(registry.entities.values()):
+                    if entity.platform != DOMAIN or entity.config_entry_id != config_entry.entry_id:
+                        continue
+                    if entity.unique_id == desired_uid:
+                        continue
+                    # Try to converge to desired UID. If desired already exists, remove this legacy one; else rename it
+                    existing_entity_id = registry.async_get_entity_id(entity.domain, DOMAIN, desired_uid)
+                    if existing_entity_id and existing_entity_id != entity.entity_id:
+                        _LOGGER.info(
+                            "Removing legacy entity %s (unique_id=%s) due to existing canonical %s",
+                            entity.entity_id,
+                            entity.unique_id,
+                            existing_entity_id,
+                        )
+                        registry.async_remove(entity.entity_id)
+                    else:
+                        registry.async_update_entity(entity.entity_id, new_unique_id=desired_uid)
+                        _LOGGER.info("Updated unique_id for %s to %s", entity.entity_id, desired_uid)
+
+            # Bump version
+            config_entry.version = 2
         return True
     except Exception as err:
-        _LOGGER.warning("Migration step skipped due to error: %s", err)
+        _LOGGER.warning("Config entry migration skipped due to error: %s", err)
         return True
 
 
