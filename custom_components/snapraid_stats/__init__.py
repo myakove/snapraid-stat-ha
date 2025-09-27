@@ -61,6 +61,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except ConfigEntryNotReady as err:
         _LOGGER.warning("Initial data refresh failed: %s. Proceeding with setup; sensor will be Unavailable until next refresh.", err)
 
+    # Entity registry migration: normalize unique_id to include domain prefix and remove duplicates
+    try:
+        registry = er.async_get(hass)
+        host = entry.data.get(CONF_HOST)
+        if host:
+            desired_uid = f"{DOMAIN}_{host}_{SENSOR_UNIQUE_ID}"
+            legacy_uids = [
+                f"{host}_{SENSOR_UNIQUE_ID}",
+                f"{SENSOR_UNIQUE_ID}_{host}",
+            ]
+            # Find current entity for this config entry provided by this integration
+            for entity in list(registry.entities.values()):
+                if entity.platform != DOMAIN or entity.config_entry_id != entry.entry_id:
+                    continue
+                if entity.unique_id == desired_uid:
+                    continue
+                if (entity.unique_id in legacy_uids) or (
+                    entity.unique_id.endswith(f"_{SENSOR_UNIQUE_ID}") and not entity.unique_id.startswith(f"{DOMAIN}_")
+                ):
+                    # If another entity already has the desired UID, remove the legacy one
+                    existing_entity_id = registry.async_get_entity_id(entity.domain, DOMAIN, desired_uid)
+                    if existing_entity_id:
+                        _LOGGER.info(
+                            "Removing legacy orphan entity %s (unique_id=%s) in favor of %s",
+                            entity.entity_id,
+                            entity.unique_id,
+                            existing_entity_id,
+                        )
+                        registry.async_remove(entity.entity_id)
+                    else:
+                        registry.async_update_entity(entity.entity_id, new_unique_id=desired_uid)
+                        _LOGGER.info(
+                            "Migrated entity unique_id from %s to %s for %s",
+                            entity.unique_id,
+                            desired_uid,
+                            entity.entity_id,
+                        )
+    except Exception as err:
+        _LOGGER.debug("Entity registry migration skipped: %s", err)
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
