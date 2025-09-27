@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2025-09-27
+
+### Fixed
+- **Critical**: Enhanced platform setup/unload state handling to resolve persistent reload errors
+- Added specific handling for "Config entry was never loaded!" and "already been setup!" errors
+- Improved state consistency between setup and unload operations
+- More robust error recovery during integration reload cycles
+- Better logging for troubleshooting platform state issues
+
+### Improved
+- Defensive programming against Home Assistant platform state inconsistencies
+- More graceful handling of partial setup/unload failures
+- Enhanced debug logging for platform lifecycle events
+
 ## [1.3.6] - 2025-09-27
 
 ### Fixed

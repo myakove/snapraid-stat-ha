@@ -48,7 +48,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        # Only setup platforms if not already done
+        try:
+            await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        except ValueError as err:
+            if "has already been setup!" in str(err):
+                _LOGGER.warning("Platforms already setup for entry %s, skipping platform setup", entry.entry_id)
+            else:
+                raise
 
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
@@ -63,24 +70,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     try:
+        # Check if platforms are actually loaded before trying to unload
         unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    except ValueError as err:
+        if "Config entry was never loaded!" in str(err):
+            _LOGGER.warning("Config entry %s was never loaded, treating as successful unload", entry.entry_id)
+            unload_ok = True  # Treat as successful since it wasn't loaded anyway
+        else:
+            _LOGGER.error("ValueError during platform unload for entry %s: %s", entry.entry_id, err)
+            unload_ok = False
     except Exception as err:
-        _LOGGER.warning("Error unloading platforms for entry %s: %s", entry.entry_id, err)
+        _LOGGER.error("Unexpected error unloading platforms for entry %s: %s", entry.entry_id, err)
         unload_ok = False
 
     # Always try to clean up data, even if platform unload failed
-    hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    coordinator_data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    if coordinator_data:
+        _LOGGER.debug("Cleaned up coordinator data for entry %s", entry.entry_id)
 
     return unload_ok
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry."""
-    unload_result = await async_unload_entry(hass, entry)
-    if not unload_result:
-        _LOGGER.warning("Failed to unload entry %s, proceeding with setup anyway", entry.entry_id)
+    _LOGGER.debug("Reloading config entry %s", entry.entry_id)
 
-    await async_setup_entry(hass, entry)
+    # Try to unload, but don't fail if it's not loaded
+    try:
+        unload_result = await async_unload_entry(hass, entry)
+        if not unload_result:
+            _LOGGER.warning("Unload returned False for entry %s, but continuing with reload", entry.entry_id)
+    except Exception as err:
+        _LOGGER.warning("Error during unload of entry %s: %s. Continuing with setup.", entry.entry_id, err)
+
+    # Always try to setup, even if unload had issues
+    try:
+        await async_setup_entry(hass, entry)
+        _LOGGER.debug("Successfully reloaded entry %s", entry.entry_id)
+    except Exception as err:
+        _LOGGER.error("Failed to setup entry %s during reload: %s", entry.entry_id, err)
+        raise
 
 
 class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
