@@ -139,32 +139,41 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                 await self._run_ssh_command("which snapraid")
                 _LOGGER.debug("Snapraid found on remote system")
 
-                # Get snapraid version if we haven't already
-                if self.snapraid_version is None:
+                # Get snapraid version if we haven't already or if it's still Unknown
+                if self.snapraid_version is None or self.snapraid_version == "Unknown":
+                    _LOGGER.info("Attempting to detect snapraid version on %s", self.host)
                     try:
                         # Try without sudo first, as version command typically doesn't need root
+                        version_output = None
                         try:
                             version_output = await self._run_ssh_command("snapraid --version")
-                            _LOGGER.debug("Snapraid version output (no sudo): %s", version_output)
+                            _LOGGER.info("Snapraid version output (no sudo): %s", version_output)
                         except Exception as no_sudo_err:
-                            _LOGGER.debug("Version command failed without sudo: %s, trying with sudo", no_sudo_err)
+                            _LOGGER.info("Version command failed without sudo: %s, trying with sudo", no_sudo_err)
                             # If that fails, try with sudo
-                            version_output = await self._run_ssh_command("sudo snapraid --version")
-                            _LOGGER.debug("Snapraid version output (with sudo): %s", version_output)
+                            try:
+                                version_output = await self._run_ssh_command("sudo snapraid --version")
+                                _LOGGER.info("Snapraid version output (with sudo): %s", version_output)
+                            except Exception as sudo_err:
+                                _LOGGER.error("Version command failed with sudo: %s", sudo_err)
+                                raise sudo_err
 
-                        # Parse version from output like "snapraid v12.4 by Andrea Mazzoleni"
-                        for line in version_output.strip().splitlines():
-                            version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
-                            if version_match:
-                                self.snapraid_version = version_match.group(1)
-                                _LOGGER.info("Detected snapraid version: %s", self.snapraid_version)
-                                break
+                        if version_output:
+                            # Parse version from output like "snapraid v12.4 by Andrea Mazzoleni"
+                            _LOGGER.info("Parsing version from output: %s", repr(version_output))
+                            for line in version_output.strip().splitlines():
+                                _LOGGER.debug("Checking line: %s", repr(line))
+                                version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
+                                if version_match:
+                                    self.snapraid_version = version_match.group(1)
+                                    _LOGGER.info("Successfully detected snapraid version: %s", self.snapraid_version)
+                                    break
 
                         if self.snapraid_version is None:
-                            _LOGGER.warning("Could not parse snapraid version from: %s", version_output)
+                            _LOGGER.warning("Could not parse snapraid version from output: %s", repr(version_output))
                             self.snapraid_version = "Unknown"
                     except Exception as ver_err:
-                        _LOGGER.warning("Could not get snapraid version: %s", ver_err)
+                        _LOGGER.error("Failed to get snapraid version: %s", ver_err)
                         self.snapraid_version = "Unknown"
 
             except Exception as err:

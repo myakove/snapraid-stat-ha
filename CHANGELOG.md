@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.12] - 2025-09-27
+
+### Fixed
+- **Enhanced snapraid version detection debugging**
+- Version detection now retries on every update until successful
+- Improved logging to INFO level for better visibility of version detection
+- Enhanced device info update logic with better logging
+- Added detailed parsing and error messages for troubleshooting
+
+### Debug
+- Added comprehensive logging for version detection process
+- Better error handling for version command execution
+- Improved device registry update mechanism
+
 ## [1.3.11] - 2025-09-27
 
 ### Fixed

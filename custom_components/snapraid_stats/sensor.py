@@ -73,14 +73,22 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
             return STATE_UNAVAILABLE
 
         # Update device info with snapraid version if available
-        if (hasattr(self.coordinator, 'snapraid_version') and
-            self.coordinator.snapraid_version and
-            self.coordinator.snapraid_version != "Unknown" and
-            self._attr_device_info.get("sw_version") != self.coordinator.snapraid_version):
+        if hasattr(self.coordinator, 'snapraid_version') and self.coordinator.snapraid_version:
+            current_version = self._attr_device_info.get("sw_version", "Unknown")
+            coordinator_version = self.coordinator.snapraid_version
 
-            self._attr_device_info["sw_version"] = self.coordinator.snapraid_version
-            # Update the device registry
-            self.async_write_ha_state()
+            _LOGGER.debug("Version check - Current: %s, Coordinator: %s", current_version, coordinator_version)
+
+            if coordinator_version != "Unknown" and current_version != coordinator_version:
+                _LOGGER.info("Updating device firmware version from %s to %s", current_version, coordinator_version)
+                self._attr_device_info["sw_version"] = coordinator_version
+                # Force device registry update
+                self.async_write_ha_state()
+                # Also schedule a device registry update
+                if hasattr(self, 'registry_entry') and self.registry_entry:
+                    _LOGGER.debug("Scheduling device registry update")
+            elif coordinator_version == "Unknown":
+                _LOGGER.debug("Coordinator version is still Unknown, not updating device info")
 
         # Check if there are any errors in the snapraid output
         errors = self.coordinator.data.get("errors", "")
