@@ -244,12 +244,30 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 stdout_data = stdout.read().decode().strip()
                 stderr_data = stderr.read().decode().strip()
 
+                # Handle exit codes appropriately
                 if exit_status != 0:
-                    _LOGGER.error("SSH command '%s' failed (exit code %d)", command, exit_status)
-                    _LOGGER.error("STDOUT: %s", stdout_data)
-                    _LOGGER.error("STDERR: %s", stderr_data)
-                    error_msg = stderr_data if stderr_data else stdout_data
-                    raise Exception(f"SSH command failed (exit code {exit_status}): {error_msg}")
+                    # Handle snapraid-specific exit codes
+                    if "snapraid" in command:
+                        if exit_status == 2:
+                            # Exit code 2: differences found (for diff) or errors detected (for status)
+                            _LOGGER.debug("Snapraid exit code 2: differences or errors found (normal operation)")
+                        elif exit_status == 1:
+                            # Exit code 1: warnings or minor issues (still usable output)
+                            _LOGGER.warning("Snapraid exit code 1: warnings detected but continuing")
+                        else:
+                            # Other exit codes are actual failures
+                            _LOGGER.error("SSH command '%s' failed (exit code %d)", command, exit_status)
+                            _LOGGER.error("STDOUT: %s", stdout_data)
+                            _LOGGER.error("STDERR: %s", stderr_data)
+                            error_msg = stderr_data if stderr_data else stdout_data
+                            raise Exception(f"SSH command failed (exit code {exit_status}): {error_msg}")
+                    else:
+                        # Non-snapraid commands should still fail on non-zero exit codes
+                        _LOGGER.error("SSH command '%s' failed (exit code %d)", command, exit_status)
+                        _LOGGER.error("STDOUT: %s", stdout_data)
+                        _LOGGER.error("STDERR: %s", stderr_data)
+                        error_msg = stderr_data if stderr_data else stdout_data
+                        raise Exception(f"SSH command failed (exit code {exit_status}): {error_msg}")
 
                 return stdout_data
 
