@@ -56,7 +56,7 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
         # Note: sw_version will be updated with actual snapraid version after first update
         self._attr_device_info = {
             "identifiers": {(DOMAIN, self._host)},
-            "name": f"{self._device_name} ({self._host})",
+            "name": f"{self._device_name}",
             "manufacturer": "Home Assistant Community",
             "model": "SnapRaid Stats Integration",
             "sw_version": "Unknown",
@@ -102,6 +102,19 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
                 self.async_write_ha_state()
             elif coordinator_version == "Unknown":
                 _LOGGER.debug("Coordinator version is still Unknown, not updating device info")
+
+        # Ensure device registry name no longer contains host, unless user renamed it
+        try:
+            device_registry = dr.async_get(self.hass)
+            device = device_registry.async_get_device(identifiers={(DOMAIN, self._host)})
+            if device and not device.name_by_user:
+                old_name = f"{self._device_name} ({self._host})"
+                desired_name = self._device_name
+                if device.name != desired_name and device.name == old_name:
+                    device_registry.async_update_device(device.id, name=desired_name)
+                    _LOGGER.info("Updated device name from '%s' to '%s'", old_name, desired_name)
+        except Exception:
+            pass
 
         # Check if there are any errors in the snapraid output (tolerant parsing)
         errors_text = (self.coordinator.data.get("errors") or "").strip()
