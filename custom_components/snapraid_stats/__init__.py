@@ -89,6 +89,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         self.debug_logging = entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING)
         self.device_name = entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
         self.snapraid_version = None  # Will be set during first update
+        self._consecutive_failures = 0  # Track consecutive failures
 
         super().__init__(
             hass,
@@ -100,29 +101,52 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
     async def _async_update_data(self) -> dict[str, str]:
         """Update data via library."""
         try:
-            return await self._get_snapraid_stats()
+            _LOGGER.debug("Starting data update for %s (attempt after %d consecutive failures)",
+                         self.host, self._consecutive_failures)
+            result = await self._get_snapraid_stats()
+            _LOGGER.debug("Data update successful for %s, got %d stats", self.host, len(result))
+            # Reset failure counter on success
+            if self._consecutive_failures > 0:
+                _LOGGER.info("Connection to %s recovered after %d failures", self.host, self._consecutive_failures)
+                self._consecutive_failures = 0
+            return result
         except Exception as exception:
-            raise UpdateFailed(exception) from exception
+            self._consecutive_failures += 1
+            _LOGGER.error("Data update failed for %s (failure #%d): %s",
+                         self.host, self._consecutive_failures, exception)
+
+            # Provide different error messages based on failure count
+            if self._consecutive_failures <= 3:
+                _LOGGER.warning("Temporary connection issue with %s, will retry next update", self.host)
+            else:
+                _LOGGER.error("Multiple consecutive failures (%d) for %s, check SSH connectivity",
+                             self._consecutive_failures, self.host)
+
+            raise UpdateFailed(f"SSH connection failed (attempt #{self._consecutive_failures}): {exception}") from exception
 
     async def _get_snapraid_stats(self) -> dict[str, str]:
         """Get snapraid statistics from the remote server."""
-        if self.debug_logging:
-            _LOGGER.debug("Getting snapraid stats from %s", self.host)
+        _LOGGER.debug("Getting snapraid stats from %s", self.host)
         stats = {}
 
         try:
             # First check if snapraid is available and get version
             try:
                 await self._run_ssh_command("which snapraid")
-                if self.debug_logging:
-                    _LOGGER.debug("Snapraid found on remote system")
+                _LOGGER.debug("Snapraid found on remote system")
 
                 # Get snapraid version if we haven't already
                 if self.snapraid_version is None:
                     try:
-                        version_output = await self._run_ssh_command("snapraid --version")
-                        if self.debug_logging:
-                            _LOGGER.debug("Snapraid version output: %s", version_output)
+                        # Try without sudo first, as version command typically doesn't need root
+                        try:
+                            version_output = await self._run_ssh_command("snapraid --version")
+                            _LOGGER.debug("Snapraid version output (no sudo): %s", version_output)
+                        except Exception as no_sudo_err:
+                            _LOGGER.debug("Version command failed without sudo: %s, trying with sudo", no_sudo_err)
+                            # If that fails, try with sudo
+                            version_output = await self._run_ssh_command("sudo snapraid --version")
+                            _LOGGER.debug("Snapraid version output (with sudo): %s", version_output)
 
                         # Parse version from output like "snapraid v12.4 by Andrea Mazzoleni"
                         import re
@@ -130,8 +154,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                             version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
                             if version_match:
                                 self.snapraid_version = version_match.group(1)
-                                if self.debug_logging:
-                                    _LOGGER.debug("Detected snapraid version: %s", self.snapraid_version)
+                                _LOGGER.info("Detected snapraid version: %s", self.snapraid_version)
                                 break
 
                         if self.snapraid_version is None:
@@ -150,8 +173,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
             status_output = await self._run_ssh_command(SNAPRAID_STATUS_CMD)
             if status_output:
                 status_lines = status_output.strip().splitlines()
-                if self.debug_logging:
-                    _LOGGER.debug("Snapraid status output has %d lines", len(status_lines))
+                _LOGGER.debug("Snapraid status output has %d lines", len(status_lines))
 
                 if len(status_lines) >= 5:
                     # Get the last 5 lines for status information
@@ -163,8 +185,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                         "rehash": status_info[3].strip(),
                         "errors": status_info[4].strip(),
                     })
-                    if self.debug_logging:
-                        _LOGGER.debug("Parsed status info from last 5 lines")
+                    _LOGGER.debug("Parsed status info from last 5 lines")
                 else:
                     _LOGGER.warning("Status output has only %d lines, expected at least 5", len(status_lines))
                     # Provide default values
@@ -180,8 +201,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
             diff_output = await self._run_ssh_command(SNAPRAID_DIFF_CMD)
             if diff_output:
                 diff_lines = diff_output.strip().splitlines()
-                if self.debug_logging:
-                    _LOGGER.debug("Snapraid diff output has %d lines", len(diff_lines))
+                _LOGGER.debug("Snapraid diff output has %d lines", len(diff_lines))
 
                 # Use regex to match statistics pattern: whitespace + number + space + keyword
                 # Pattern matches: "     355067 equal", "      676 added", etc.
@@ -200,12 +220,10 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                         keyword = match.group(2)
                         stats_dict[keyword] = count
                         matched_lines += 1
-                        if self.debug_logging:
-                            _LOGGER.debug("Regex matched: %s = %s", keyword, count)
+                        _LOGGER.debug("Regex matched: %s = %s", keyword, count)
 
-                if self.debug_logging:
-                    _LOGGER.debug("Found %d statistics using regex from %d total lines: %s",
-                                matched_lines, len(diff_lines), stats_dict)
+                _LOGGER.debug("Found %d statistics using regex from %d total lines: %s",
+                            matched_lines, len(diff_lines), stats_dict)
                 stats.update(stats_dict)
 
         except Exception as err:
@@ -236,11 +254,21 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                 connect_kwargs["password"] = self.password
 
                 # Connect with timeout
+                _LOGGER.debug("Connecting to %s@%s:%d", self.username, self.host, self.port)
                 client.connect(**connect_kwargs)
+                _LOGGER.debug("SSH connection established to %s", self.host)
+
+                # Test basic connectivity first
+                _LOGGER.debug("Testing basic SSH connectivity")
+                test_stdin, test_stdout, test_stderr = client.exec_command("echo test", timeout=10)
+                test_exit = test_stdout.channel.recv_exit_status()
+                if test_exit != 0:
+                    _LOGGER.error("Basic SSH connectivity test failed")
+                    raise Exception("SSH connectivity test failed")
+                _LOGGER.debug("SSH connectivity test passed")
 
                 # Execute command with sudo handling
-                if self.debug_logging:
-                    _LOGGER.debug("Executing SSH command: %s", command)
+                _LOGGER.debug("Executing SSH command: %s", command)
                 stdin, stdout, stderr = client.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
 
                 # Handle sudo password if needed
@@ -263,8 +291,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                     if "snapraid" in command:
                         if exit_status == 2:
                             # Exit code 2: differences found (for diff) or errors detected (for status)
-                            if self.debug_logging:
-                                _LOGGER.debug("Snapraid exit code 2: differences or errors found (normal operation)")
+                            _LOGGER.debug("Snapraid exit code 2: differences or errors found (normal operation)")
                         elif exit_status == 1:
                             # Exit code 1: warnings or minor issues (still usable output)
                             _LOGGER.warning("Snapraid exit code 1: warnings detected but continuing")
@@ -286,17 +313,17 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                 return stdout_data
 
             except paramiko.AuthenticationException as err:
-                _LOGGER.error("SSH authentication failed: %s", err)
+                _LOGGER.error("SSH authentication failed for %s@%s: %s", self.username, self.host, err)
                 raise Exception(f"SSH authentication failed: {err}")
             except socket.timeout as err:
-                _LOGGER.error("SSH command timed out after %d seconds: %s", SSH_COMMAND_TIMEOUT, err)
+                _LOGGER.error("SSH command '%s' timed out after %d seconds on %s: %s",
+                             command, SSH_COMMAND_TIMEOUT, self.host, err)
                 raise Exception(f"SSH command timed out: {err}")
             except (paramiko.SSHException, socket.error) as err:
-                _LOGGER.error("SSH connection failed: %s", err)
+                _LOGGER.error("SSH connection failed to %s:%d: %s", self.host, self.port, err)
                 raise Exception(f"SSH connection failed: {err}")
             except Exception as err:
-                _LOGGER.error("Error running SSH command '%s': %s", command, err)
-                # No SSH key authentication in password-only mode
+                _LOGGER.error("Error running SSH command '%s' on %s: %s", command, self.host, err)
                 raise Exception(f"SSH command failed: {err}")
             finally:
                 if client:
@@ -305,5 +332,5 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         try:
             return await self.hass.async_add_executor_job(_execute_ssh_command)
         except Exception as err:
-            _LOGGER.error("Failed to execute SSH command: %s", err)
+            _LOGGER.error("Failed to execute SSH command '%s' on %s: %s", command, self.host, err)
             raise

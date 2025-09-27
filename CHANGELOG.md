@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.10] - 2025-09-27
+
+### Fixed
+- **Critical**: Fixed debug logging not appearing in Home Assistant logs
+- **Critical**: Fixed sensor becoming unavailable after initial successful connection
+- Removed conditional debug logging checks that prevented debug messages from being displayed
+- Debug logs now appear when Home Assistant logging level is set to DEBUG
+- Enhanced snapraid version detection with fallback to sudo if needed
+- Improved version detection error logging and troubleshooting
+- Added SSH connectivity testing and better connection error handling
+- Enhanced error tracking with consecutive failure counting
+
+### Changed
+- Debug logging configuration option now only affects integration behavior, not log visibility
+- Version detection now tries without sudo first, then with sudo as fallback
+- Better error handling for snapraid version command execution
+
 ## [1.3.9] - 2025-09-27
 
 ### Changed
