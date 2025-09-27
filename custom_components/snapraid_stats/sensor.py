@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SnapraidStatsDataUpdateCoordinator
-from .const import DOMAIN, SENSOR_NAME, SENSOR_UNIQUE_ID, STATE_ERROR, STATE_OK, STATE_UNAVAILABLE
+from .const import CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME, DOMAIN, SENSOR_NAME, SENSOR_UNIQUE_ID, STATE_ERROR, STATE_OK, STATE_UNAVAILABLE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +37,8 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
-        self._attr_name = SENSOR_NAME
+        self._device_name = config_entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
+        self._attr_name = f"{self._device_name} {SENSOR_NAME}"
         self._attr_unique_id = f"{SENSOR_UNIQUE_ID}_{config_entry.entry_id}"
         self._attr_icon = "mdi:harddisk"
         self._host = config_entry.data[CONF_HOST]
@@ -47,7 +48,7 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
         """Return device information about this entity."""
         return {
             "identifiers": {(DOMAIN, self._host)},
-            "name": f"Snapraid Server ({self._host})",
+            "name": f"{self._device_name} ({self._host})",
             "manufacturer": "Snapraid",
             "model": "Stats Monitor",
             "sw_version": "1.0.0",

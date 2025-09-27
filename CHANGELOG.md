@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.9] - 2025-09-27
+
+### Changed
+- **Breaking**: Simplified authentication to password-only (removed SSH key support)
+- Debug logging is now a configurable option instead of always enabled
+- Added configurable device name with default "SnapRaid"
+- Sensor name now includes device name: "[Device Name] Snapraid Stats"
+- Device display name now shows: "[Device Name] (hostname)"
+
+### Removed
+- SSH key authentication support (password authentication only)
+- Always-on debug logging (now configurable)
+- SSH key related configuration fields and validation
+
+### Fixed
+- Conditional debug logging reduces log noise when disabled
+- Simplified configuration flow for easier setup
+- Removed unused SSH key parsing logic
+
+## [1.2.8] - 2025-09-27
+
+### Fixed
+- **Critical**: Fix snapraid exit code handling to allow normal exit codes 1 and 2
+- Exit code 2 from `snapraid diff` is normal and means "there are differences"
+- Exit code 1 from snapraid commands indicates warnings but usable output
+- Only fail on exit codes 3+ which indicate actual command failures
+- Maintain strict exit code checking for non-snapraid commands
+
+### Added
+- Appropriate debug/warning logging for different snapraid exit codes
+- Better distinction between normal snapraid behavior and actual failures
+
+### Changed
+- Integration no longer fails when snapraid finds differences (the expected case)
+- More nuanced error handling based on snapraid's exit code conventions
+
 ## [1.2.7] - 2025-09-27
 
 ### Fixed

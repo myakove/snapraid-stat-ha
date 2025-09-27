@@ -7,14 +7,11 @@ CONF_HOST = "host"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_PORT = "port"
-CONF_AUTH_TYPE = "auth_type"
-CONF_SSH_KEY = "ssh_key"
 CONF_SUDO_METHOD = "sudo_method"
 CONF_SUDO_PASSWORD = "sudo_password"
+CONF_DEBUG_LOGGING = "debug_logging"
+CONF_DEVICE_NAME = "device_name"
 
-# Authentication types
-AUTH_TYPE_PASSWORD = "password"
-AUTH_TYPE_SSH_KEY = "ssh_key"
 
 # Sudo methods
 SUDO_METHOD_PASSWORDLESS = "passwordless"
@@ -24,8 +21,9 @@ SUDO_METHOD_SSH_PASSWORD = "ssh_password"
 # Default values
 DEFAULT_PORT = 22
 DEFAULT_SCAN_INTERVAL = 3600  # 1 hour in seconds
-DEFAULT_AUTH_TYPE = AUTH_TYPE_PASSWORD
 DEFAULT_SUDO_METHOD = SUDO_METHOD_PASSWORDLESS
+DEFAULT_DEBUG_LOGGING = False
+DEFAULT_DEVICE_NAME = "SnapRaid"
 
 # Entity names
 SENSOR_NAME = "Snapraid Stats"

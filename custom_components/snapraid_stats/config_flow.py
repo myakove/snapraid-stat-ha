@@ -17,13 +17,12 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .const import (
-    AUTH_TYPE_PASSWORD,
-    AUTH_TYPE_SSH_KEY,
-    CONF_AUTH_TYPE,
-    CONF_SSH_KEY,
+    CONF_DEBUG_LOGGING,
+    CONF_DEVICE_NAME,
     CONF_SUDO_METHOD,
     CONF_SUDO_PASSWORD,
-    DEFAULT_AUTH_TYPE,
+    DEFAULT_DEBUG_LOGGING,
+    DEFAULT_DEVICE_NAME,
     DEFAULT_PORT,
     DEFAULT_SUDO_METHOD,
     DOMAIN,
@@ -40,11 +39,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_AUTH_TYPE, default=DEFAULT_AUTH_TYPE): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
-        vol.Optional(CONF_PASSWORD): str,
-        vol.Optional(CONF_SSH_KEY): selector.TextSelector(
-            selector.TextSelectorConfig(multiline=True)
-        ),
+        vol.Required(CONF_PASSWORD): str,
         vol.Required(CONF_SUDO_METHOD, default=DEFAULT_SUDO_METHOD): vol.In([
             SUDO_METHOD_PASSWORDLESS,
             SUDO_METHOD_PASSWORD,
@@ -52,6 +47,8 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         ]),
         vol.Optional(CONF_SUDO_PASSWORD): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
+        vol.Optional(CONF_DEBUG_LOGGING, default=DEFAULT_DEBUG_LOGGING): bool,
+        vol.Optional(CONF_DEVICE_NAME, default=DEFAULT_DEVICE_NAME): str,
     }
 )
 
@@ -63,20 +60,14 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """
     host = data[CONF_HOST]
     username = data[CONF_USERNAME]
-    auth_type = data.get(CONF_AUTH_TYPE, DEFAULT_AUTH_TYPE)
-    password = data.get(CONF_PASSWORD)
-    ssh_key = data.get(CONF_SSH_KEY)
+    password = data[CONF_PASSWORD]
     sudo_method = data.get(CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD)
     sudo_password = data.get(CONF_SUDO_PASSWORD)
     port = data[CONF_PORT]
 
     # Validate authentication parameters
-    if auth_type == AUTH_TYPE_PASSWORD and not password:
-        raise Exception("Password is required for password authentication")
-    if auth_type == AUTH_TYPE_SSH_KEY and not ssh_key:
-        raise Exception("SSH key is required for SSH key authentication")
-    if auth_type == AUTH_TYPE_SSH_KEY and len(ssh_key.strip()) > 8192:
-        raise Exception("SSH key is too long (maximum 8192 characters)")
+    if not password:
+        raise Exception("Password is required")
 
     # Validate sudo parameters
     if sudo_method == SUDO_METHOD_PASSWORD and not sudo_password:
@@ -99,42 +90,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
                 "look_for_keys": False,
             }
 
-            if auth_type == AUTH_TYPE_PASSWORD:
-                connect_kwargs["password"] = password
-            elif auth_type == AUTH_TYPE_SSH_KEY:
-                # Parse SSH key - try different key types
-                key_obj = None
-                ssh_key_clean = ssh_key.strip()
-
-                # Validate key format
-                if not ssh_key_clean:
-                    raise Exception("SSH key cannot be empty")
-
-                # Try different key types
-                key_types = [
-                    ("Ed25519", paramiko.Ed25519Key),
-                    ("RSA", paramiko.RSAKey),
-                    ("ECDSA", paramiko.ECDSAKey),
-                    ("DSS/DSA", paramiko.DSSKey),
-                ]
-
-                last_error = None
-                for key_type_name, key_class in key_types:
-                    try:
-                        key_obj = key_class.from_private_key(StringIO(ssh_key_clean))
-                        _LOGGER.debug("Successfully parsed %s SSH key", key_type_name)
-                        break
-                    except Exception as err:
-                        last_error = err
-                        _LOGGER.debug("Failed to parse as %s key: %s", key_type_name, err)
-                        continue
-
-                if key_obj is None:
-                    error_msg = f"Invalid SSH key format. Last error: {last_error}"
-                    _LOGGER.error(error_msg)
-                    raise Exception(error_msg)
-
-                connect_kwargs["pkey"] = key_obj
+            connect_kwargs["password"] = password
 
             # Connect with timeout
             client.connect(**connect_kwargs)
@@ -170,16 +126,13 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
                 elif sudo_method == SUDO_METHOD_SSH_PASSWORD:
                     # Test sudo with SSH password
-                    if auth_type == AUTH_TYPE_PASSWORD:
-                        stdin, stdout, stderr = client.exec_command("sudo -S true", timeout=SSH_COMMAND_TIMEOUT)
-                        stdin.write(f"{password}\n")
-                        stdin.flush()
-                        exit_status = stdout.channel.recv_exit_status()
-                        if exit_status != 0:
-                            _LOGGER.error("Sudo with SSH password failed: %s", stderr.read().decode())
-                            raise Exception("Sudo with SSH password failed")
-                    else:
-                        raise Exception("SSH password sudo method only works with password authentication")
+                    stdin, stdout, stderr = client.exec_command("sudo -S true", timeout=SSH_COMMAND_TIMEOUT)
+                    stdin.write(f"{password}\n")
+                    stdin.flush()
+                    exit_status = stdout.channel.recv_exit_status()
+                    if exit_status != 0:
+                        _LOGGER.error("Sudo with SSH password failed: %s", stderr.read().decode())
+                        raise Exception("Sudo with SSH password failed")
 
                 # Test snapraid command if sudo works
                 _LOGGER.debug("Testing snapraid command with sudo method: %s", sudo_method)
@@ -187,7 +140,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
                 if sudo_method == SUDO_METHOD_PASSWORD:
                     stdin.write(f"{sudo_password}\n")
                     stdin.flush()
-                elif sudo_method == SUDO_METHOD_SSH_PASSWORD and auth_type == AUTH_TYPE_PASSWORD:
+                elif sudo_method == SUDO_METHOD_SSH_PASSWORD:
                     stdin.write(f"{password}\n")
                     stdin.flush()
 
@@ -303,23 +256,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         suggested_values = {
             CONF_HOST: self.config_entry.data.get(CONF_HOST, ""),
             CONF_USERNAME: self.config_entry.data.get(CONF_USERNAME, ""),
-            CONF_AUTH_TYPE: self.config_entry.data.get(CONF_AUTH_TYPE, DEFAULT_AUTH_TYPE),
             CONF_PASSWORD: self.config_entry.data.get(CONF_PASSWORD, ""),
-            CONF_SSH_KEY: self.config_entry.data.get(CONF_SSH_KEY, ""),
             CONF_SUDO_METHOD: self.config_entry.data.get(CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD),
             CONF_SUDO_PASSWORD: self.config_entry.data.get(CONF_SUDO_PASSWORD, ""),
             CONF_PORT: self.config_entry.data.get(CONF_PORT, DEFAULT_PORT),
+            CONF_DEBUG_LOGGING: self.config_entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING),
+            CONF_DEVICE_NAME: self.config_entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME),
         }
 
         options_schema = vol.Schema(
             {
                 vol.Required(CONF_HOST, default=suggested_values[CONF_HOST]): str,
                 vol.Required(CONF_USERNAME, default=suggested_values[CONF_USERNAME]): str,
-                vol.Required(CONF_AUTH_TYPE, default=suggested_values[CONF_AUTH_TYPE]): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
-                vol.Optional(CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]): str,
-                vol.Optional(CONF_SSH_KEY, default=suggested_values[CONF_SSH_KEY]): selector.TextSelector(
-                    selector.TextSelectorConfig(multiline=True)
-                ),
+                vol.Required(CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]): str,
                 vol.Required(CONF_SUDO_METHOD, default=suggested_values[CONF_SUDO_METHOD]): vol.In([
                     SUDO_METHOD_PASSWORDLESS,
                     SUDO_METHOD_PASSWORD,
@@ -327,6 +276,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ]),
                 vol.Optional(CONF_SUDO_PASSWORD, default=suggested_values[CONF_SUDO_PASSWORD]): str,
                 vol.Optional(CONF_PORT, default=suggested_values[CONF_PORT]): int,
+                vol.Optional(CONF_DEBUG_LOGGING, default=suggested_values[CONF_DEBUG_LOGGING]): bool,
+                vol.Optional(CONF_DEVICE_NAME, default=suggested_values[CONF_DEVICE_NAME]): str,
             }
         )
 

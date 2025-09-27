@@ -15,13 +15,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    AUTH_TYPE_PASSWORD,
-    AUTH_TYPE_SSH_KEY,
-    CONF_AUTH_TYPE,
-    CONF_SSH_KEY,
+    CONF_DEBUG_LOGGING,
+    CONF_DEVICE_NAME,
     CONF_SUDO_METHOD,
     CONF_SUDO_PASSWORD,
-    DEFAULT_AUTH_TYPE,
+    DEFAULT_DEBUG_LOGGING,
+    DEFAULT_DEVICE_NAME,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SUDO_METHOD,
     DOMAIN,
@@ -75,12 +74,12 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         self.host = entry.data[CONF_HOST]
         self.username = entry.data[CONF_USERNAME]
-        self.auth_type = entry.data.get(CONF_AUTH_TYPE, DEFAULT_AUTH_TYPE)
-        self.password = entry.data.get(CONF_PASSWORD)
-        self.ssh_key = entry.data.get(CONF_SSH_KEY)
+        self.password = entry.data[CONF_PASSWORD]
         self.sudo_method = entry.data.get(CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD)
         self.sudo_password = entry.data.get(CONF_SUDO_PASSWORD)
         self.port = entry.data[CONF_PORT]
+        self.debug_logging = entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING)
+        self.device_name = entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
 
         super().__init__(
             hass,
@@ -98,14 +97,16 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _get_snapraid_stats(self) -> dict[str, str]:
         """Get snapraid statistics from the remote server."""
-        _LOGGER.debug("Getting snapraid stats from %s", self.host)
+        if self.debug_logging:
+            _LOGGER.debug("Getting snapraid stats from %s", self.host)
         stats = {}
 
         try:
             # First check if snapraid is available
             try:
                 await self._run_ssh_command("which snapraid")
-                _LOGGER.debug("Snapraid found on remote system")
+                if self.debug_logging:
+                    _LOGGER.debug("Snapraid found on remote system")
             except Exception as err:
                 _LOGGER.warning("Snapraid command may not be available: %s", err)
 
@@ -113,7 +114,8 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
             status_output = await self._run_ssh_command(SNAPRAID_STATUS_CMD)
             if status_output:
                 status_lines = status_output.strip().splitlines()
-                _LOGGER.debug("Snapraid status output has %d lines", len(status_lines))
+                if self.debug_logging:
+                    _LOGGER.debug("Snapraid status output has %d lines", len(status_lines))
 
                 if len(status_lines) >= 5:
                     # Get the last 5 lines for status information
@@ -125,7 +127,8 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                         "rehash": status_info[3].strip(),
                         "errors": status_info[4].strip(),
                     })
-                    _LOGGER.debug("Parsed status info from last 5 lines")
+                    if self.debug_logging:
+                        _LOGGER.debug("Parsed status info from last 5 lines")
                 else:
                     _LOGGER.warning("Status output has only %d lines, expected at least 5", len(status_lines))
                     # Provide default values
@@ -141,7 +144,8 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
             diff_output = await self._run_ssh_command(SNAPRAID_DIFF_CMD)
             if diff_output:
                 diff_lines = diff_output.strip().splitlines()
-                _LOGGER.debug("Snapraid diff output has %d lines", len(diff_lines))
+                if self.debug_logging:
+                    _LOGGER.debug("Snapraid diff output has %d lines", len(diff_lines))
 
                 # Use regex to match statistics pattern: whitespace + number + space + keyword
                 # Pattern matches: "     355067 equal", "      676 added", etc.
@@ -160,10 +164,12 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                         keyword = match.group(2)
                         stats_dict[keyword] = count
                         matched_lines += 1
-                        _LOGGER.debug("Regex matched: %s = %s", keyword, count)
+                        if self.debug_logging:
+                            _LOGGER.debug("Regex matched: %s = %s", keyword, count)
 
-                _LOGGER.debug("Found %d statistics using regex from %d total lines: %s",
-                            matched_lines, len(diff_lines), stats_dict)
+                if self.debug_logging:
+                    _LOGGER.debug("Found %d statistics using regex from %d total lines: %s",
+                                matched_lines, len(diff_lines), stats_dict)
                 stats.update(stats_dict)
 
         except Exception as err:
@@ -190,43 +196,15 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                     "look_for_keys": False,
                 }
 
-                if self.auth_type == AUTH_TYPE_PASSWORD:
-                    connect_kwargs["password"] = self.password
-                elif self.auth_type == AUTH_TYPE_SSH_KEY:
-                    # Parse SSH key - try different key types
-                    key_obj = None
-                    ssh_key_clean = self.ssh_key.strip()
-
-                    # Try different key types
-                    key_types = [
-                        ("Ed25519", paramiko.Ed25519Key),
-                        ("RSA", paramiko.RSAKey),
-                        ("ECDSA", paramiko.ECDSAKey),
-                        ("DSS/DSA", paramiko.DSSKey),
-                    ]
-
-                    last_error = None
-                    for key_type_name, key_class in key_types:
-                        try:
-                            key_obj = key_class.from_private_key(StringIO(ssh_key_clean))
-                            _LOGGER.debug("Successfully parsed %s SSH key", key_type_name)
-                            break
-                        except Exception as err:
-                            last_error = err
-                            continue
-
-                    if key_obj is None:
-                        error_msg = f"Invalid SSH key format. Last error: {last_error}"
-                        _LOGGER.error(error_msg)
-                        raise Exception(error_msg)
-
-                    connect_kwargs["pkey"] = key_obj
+                # Use password authentication only
+                connect_kwargs["password"] = self.password
 
                 # Connect with timeout
                 client.connect(**connect_kwargs)
 
                 # Execute command with sudo handling
-                _LOGGER.debug("Executing SSH command: %s", command)
+                if self.debug_logging:
+                    _LOGGER.debug("Executing SSH command: %s", command)
                 stdin, stdout, stderr = client.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
 
                 # Handle sudo password if needed
@@ -234,9 +212,8 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                     stdin.write(f"{self.sudo_password}\n")
                     stdin.flush()
                 elif "sudo" in command and self.sudo_method == SUDO_METHOD_SSH_PASSWORD:
-                    if self.auth_type == AUTH_TYPE_PASSWORD:
-                        stdin.write(f"{self.password}\n")
-                        stdin.flush()
+                    stdin.write(f"{self.password}\n")
+                    stdin.flush()
 
                 exit_status = stdout.channel.recv_exit_status()
 
@@ -250,7 +227,8 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                     if "snapraid" in command:
                         if exit_status == 2:
                             # Exit code 2: differences found (for diff) or errors detected (for status)
-                            _LOGGER.debug("Snapraid exit code 2: differences or errors found (normal operation)")
+                            if self.debug_logging:
+                                _LOGGER.debug("Snapraid exit code 2: differences or errors found (normal operation)")
                         elif exit_status == 1:
                             # Exit code 1: warnings or minor issues (still usable output)
                             _LOGGER.warning("Snapraid exit code 1: warnings detected but continuing")
@@ -282,9 +260,7 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 raise Exception(f"SSH connection failed: {err}")
             except Exception as err:
                 _LOGGER.error("Error running SSH command '%s': %s", command, err)
-                # Check if it's an SSH key related error
-                if "SSH key" in str(err) or "private key" in str(err):
-                    raise Exception(f"SSH key error: {err}")
+                # No SSH key authentication in password-only mode
                 raise Exception(f"SSH command failed: {err}")
             finally:
                 if client:
