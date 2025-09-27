@@ -38,7 +38,8 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._device_name = config_entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
-        self._attr_name = f"{self._device_name} {SENSOR_NAME}"
+        # Use just "Stats" to avoid duplication when device name is "SnapRaid"
+        self._attr_name = f"{self._device_name} Stats"
         self._attr_unique_id = f"{SENSOR_UNIQUE_ID}_{config_entry.entry_id}"
         self._attr_icon = "mdi:harddisk"
         self._host = config_entry.data[CONF_HOST]
