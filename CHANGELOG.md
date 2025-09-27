@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.13] - 2025-09-27
+
+### Fixed
+- **Critical**: Fixed entity unique ID generation for better stability
+- **Critical**: Enhanced update interval logging and validation
+- Fixed "entity is no longer being provided" warning by improving entity registration
+- Improved unique ID generation to be more stable and predictable
+- Enhanced coordinator and sensor initialization logging
+
+### Changed
+- Updated unique ID format to `{domain}_{host}_{sensor_id}` for better persistence
+- Improved entity naming approach with explicit naming instead of `has_entity_name`
+- Enhanced logging throughout initialization and update processes
+
+### Debug
+- Added comprehensive logging for coordinator initialization and update intervals
+- Added sensor initialization and unique ID assignment logging
+- Better tracking of scheduled data updates with interval information
+
 ## [1.3.12] - 2025-09-27
 
 ### Fixed

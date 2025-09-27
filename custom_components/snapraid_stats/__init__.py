@@ -92,6 +92,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         self._consecutive_failures = 0  # Track consecutive failures
         self._is_updating = False  # Track if currently updating
 
+        _LOGGER.info("Initializing coordinator for %s with update interval: %d seconds", self.host, self.scan_interval)
         super().__init__(
             hass,
             _LOGGER,
@@ -103,8 +104,8 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         """Update data via library."""
         try:
             self._is_updating = True
-            _LOGGER.debug("Starting data update for %s (attempt after %d consecutive failures)",
-                         self.host, self._consecutive_failures)
+            _LOGGER.info("Starting scheduled data update for %s (attempt after %d consecutive failures, interval: %ds)",
+                        self.host, self._consecutive_failures, self.scan_interval)
             result = await self._get_snapraid_stats()
             _LOGGER.debug("Data update successful for %s, got %d stats", self.host, len(result))
             # Reset failure counter on success

@@ -41,13 +41,16 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
         self._host = config_entry.data[CONF_HOST]
         self._config_entry = config_entry
 
+        _LOGGER.info("Initializing sensor for %s (%s)", self._device_name, self._host)
+
         # Use just "Stats" to avoid duplication when device name is "SnapRaid"
         self._attr_name = f"{self._device_name} Stats"
-        # Keep config-entry based unique ID for stability
-        self._attr_unique_id = f"{SENSOR_UNIQUE_ID}_{config_entry.entry_id}"
+        # Create stable unique ID based on host and domain for persistence
+        self._attr_unique_id = f"{DOMAIN}_{self._host}_{SENSOR_UNIQUE_ID}"
+        _LOGGER.info("Setting sensor unique ID: %s", self._attr_unique_id)
         self._attr_icon = "mdi:harddisk"
         # Ensure proper platform identification
-        self._attr_has_entity_name = True
+        self._attr_has_entity_name = False  # Use explicit naming instead
         # Set device info directly to ensure proper association
         # Note: sw_version will be updated with actual snapraid version after first update
         self._attr_device_info = {
