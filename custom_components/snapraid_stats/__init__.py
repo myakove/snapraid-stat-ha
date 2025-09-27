@@ -12,7 +12,7 @@ import paramiko
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, TimestampDataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CONF_DEBUG_LOGGING,
@@ -67,7 +67,7 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await async_setup_entry(hass, entry)
 
 
-class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
+class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
     """Class to manage fetching data from the Snapraid server."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
