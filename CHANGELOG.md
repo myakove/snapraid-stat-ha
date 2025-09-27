@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2025-09-27
+
+### Added
+- Detailed error logging for SSH command failures with stdout/stderr output
+- Snapraid availability check using 'which snapraid' command
+- Debug logging for SSH command execution
+- Enhanced error messages showing exit codes and command details
+
+### Fixed
+- Improved SSH key text area implementation using selector module
+- Better diagnostics for exit code 2 errors (command not found/invalid usage)
+- More informative error reporting for troubleshooting
+
+### Changed
+- SSH command error messages now include both stdout and stderr
+- Enhanced debugging capabilities for remote command execution
+
 ## [1.2.2] - 2025-09-27
 
 ### Fixed
