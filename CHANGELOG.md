@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-09-27
+
+### Fixed
+- SSH key input field now uses proper multiline text area instead of single-line input
+- Users can now paste long SSH private keys (2000+ characters) without issues
+- Improved UI rendering for SSH key configuration
+
+### Changed
+- Replaced basic string input with TextSelector multiline text area
+- Enhanced SSH key field validation and user experience
+
 ## [1.2.1] - 2025-09-27
 
 ### Fixed
