@@ -148,16 +148,34 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                     "moved": "0", "copied": "0", "restored": "0"
                 }
 
+                # Strategy: Look for the statistics summary at the end
+                # Statistics typically appear after all file operations
+                summary_started = False
                 skipped_lines = 0
 
-                for line in diff_lines:
+                # First pass: Find where statistics start (look for first number + keyword line)
+                for i, line in enumerate(diff_lines):
                     line = line.strip()
                     if not line:
                         continue
 
-                    # Skip individual file operations (add/remove specific files)
-                    if line.startswith(('add ', 'remove ', 'update ', 'move ', 'copy ', 'restore ')):
-                        skipped_lines += 1
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            count = int(parts[0])
+                            keyword = parts[1].lower()
+                            if keyword in stats_dict:
+                                # Found start of statistics section
+                                summary_started = True
+                                _LOGGER.debug("Found statistics section starting at line %d: '%s'", i, line)
+                                break
+                        except (ValueError, IndexError):
+                            continue
+
+                # Second pass: Parse only the statistics section
+                for line in diff_lines:
+                    line = line.strip()
+                    if not line:
                         continue
 
                     parts = line.split()
@@ -167,11 +185,14 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                             keyword = parts[1].lower()
                             if keyword in stats_dict:
                                 stats_dict[keyword] = str(count)
-                                _LOGGER.debug("Found %s: %d", keyword, count)
+                                _LOGGER.debug("Found statistic %s: %d", keyword, count)
                         except (ValueError, IndexError):
+                            skipped_lines += 1
                             continue
+                    else:
+                        skipped_lines += 1
 
-                _LOGGER.debug("Skipped %d file operation lines, parsed statistics: %s", skipped_lines, stats_dict)
+                _LOGGER.debug("Processed %d lines, found statistics: %s", len(diff_lines), stats_dict)
                 stats.update(stats_dict)
 
         except Exception as err:
