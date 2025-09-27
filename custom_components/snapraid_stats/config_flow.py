@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 from typing import Any
 
+import paramiko
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
@@ -36,53 +38,62 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     password = data[CONF_PASSWORD]
     port = data[CONF_PORT]
 
-    # Test SSH connection
-    try:
-        # Escape password to handle special characters
-        escaped_password = password.replace("'", "'\"'\"'")
+    # Test SSH connection using paramiko
+    def _test_ssh_connection():
+        client = None
+        try:
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        proc = await asyncio.create_subprocess_shell(
-            f"sshpass -p '{escaped_password}' ssh -o StrictHostKeyChecking=no "
-            f"-o ConnectTimeout={SSH_TIMEOUT} -o BatchMode=no "
-            f"-p {port} {username}@{host} 'echo test'",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=SSH_TIMEOUT)
+            # Connect with timeout
+            client.connect(
+                hostname=host,
+                port=port,
+                username=username,
+                password=password,
+                timeout=SSH_TIMEOUT,
+                allow_agent=False,
+                look_for_keys=False,
+            )
 
-        if proc.returncode != 0:
-            stderr_text = stderr.decode().lower()
-            if any(err in stderr_text for err in ["permission denied", "authentication failed", "access denied"]):
-                raise InvalidAuth
-            if any(err in stderr_text for err in ["connection refused", "no route to host", "network unreachable"]):
+            # Test basic command
+            stdin, stdout, stderr = client.exec_command("echo test", timeout=SSH_TIMEOUT)
+            exit_status = stdout.channel.recv_exit_status()
+
+            if exit_status != 0:
+                error_msg = stderr.read().decode().strip()
+                _LOGGER.error("SSH test command failed: %s", error_msg)
                 raise CannotConnect
-            _LOGGER.error("SSH connection failed: %s", stderr.decode())
-            raise CannotConnect
 
-    except asyncio.TimeoutError:
-        _LOGGER.error("SSH connection timeout to %s:%s", host, port)
-        raise CannotConnect
+            # Test snapraid command (optional)
+            try:
+                stdin, stdout, stderr = client.exec_command("sudo snapraid --version", timeout=SSH_TIMEOUT)
+                exit_status = stdout.channel.recv_exit_status()
+                if exit_status != 0:
+                    _LOGGER.warning("Snapraid command test failed, but proceeding: %s", stderr.read().decode())
+            except Exception as err:
+                _LOGGER.warning("Could not test snapraid command: %s", err)
+
+        except paramiko.AuthenticationException:
+            raise InvalidAuth
+        except (paramiko.SSHException, socket.error, socket.timeout) as err:
+            _LOGGER.error("SSH connection failed: %s", err)
+            raise CannotConnect
+        except Exception as err:
+            _LOGGER.error("Unexpected error during SSH test: %s", err)
+            raise CannotConnect
+        finally:
+            if client:
+                client.close()
+
+    # Run SSH connection test in executor to avoid blocking
+    try:
+        await hass.async_add_executor_job(_test_ssh_connection)
     except (InvalidAuth, CannotConnect):
         raise
     except Exception as err:
-        _LOGGER.error("Unexpected error during SSH test: %s", err)
+        _LOGGER.error("Failed to test SSH connection: %s", err)
         raise CannotConnect
-
-    # Test snapraid command
-    try:
-        proc = await asyncio.create_subprocess_shell(
-            f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout={SSH_TIMEOUT} "
-            f"-p {port} {username}@{host} 'sudo snapraid --version'",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=SSH_TIMEOUT)
-
-        if proc.returncode != 0:
-            _LOGGER.warning("Snapraid command test failed, but proceeding: %s", stderr.decode())
-
-    except Exception as err:
-        _LOGGER.warning("Could not test snapraid command: %s", err)
 
     return {"title": f"Snapraid Stats ({host})"}
 

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 from datetime import timedelta
 
+import paramiko
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
@@ -121,36 +123,53 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
         return stats
 
     async def _run_ssh_command(self, command: str) -> str:
-        """Run a command on the remote server via SSH."""
-        # Escape password to handle special characters
-        escaped_password = self.password.replace("'", "'\"'\"'")
+        """Run a command on the remote server via SSH using paramiko."""
+        def _execute_ssh_command():
+            client = None
+            try:
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        ssh_command = (
-            f"sshpass -p '{escaped_password}' ssh -o StrictHostKeyChecking=no "
-            f"-o ConnectTimeout={SSH_TIMEOUT} -o BatchMode=no "
-            f"-p {self.port} {self.username}@{self.host} "
-            f"'{command}'"
-        )
+                # Connect with timeout
+                client.connect(
+                    hostname=self.host,
+                    port=self.port,
+                    username=self.username,
+                    password=self.password,
+                    timeout=SSH_TIMEOUT,
+                    allow_agent=False,
+                    look_for_keys=False,
+                )
+
+                # Execute command
+                stdin, stdout, stderr = client.exec_command(command, timeout=SSH_TIMEOUT * 2)
+                exit_status = stdout.channel.recv_exit_status()
+
+                # Read output
+                stdout_data = stdout.read().decode().strip()
+                stderr_data = stderr.read().decode().strip()
+
+                if exit_status != 0:
+                    _LOGGER.error("SSH command failed (exit code %d): %s", exit_status, stderr_data)
+                    raise Exception(f"SSH command failed: {stderr_data}")
+
+                return stdout_data
+
+            except paramiko.AuthenticationException as err:
+                _LOGGER.error("SSH authentication failed: %s", err)
+                raise Exception(f"SSH authentication failed: {err}")
+            except (paramiko.SSHException, socket.error, socket.timeout) as err:
+                _LOGGER.error("SSH connection failed: %s", err)
+                raise Exception(f"SSH connection failed: {err}")
+            except Exception as err:
+                _LOGGER.error("Error running SSH command '%s': %s", command, err)
+                raise Exception(f"SSH command failed: {err}")
+            finally:
+                if client:
+                    client.close()
 
         try:
-            proc = await asyncio.create_subprocess_shell(
-                ssh_command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=SSH_TIMEOUT * 2)
-
-            if proc.returncode != 0:
-                error_msg = stderr.decode().strip()
-                _LOGGER.error("SSH command failed (return code %d): %s", proc.returncode, error_msg)
-                raise Exception(f"SSH command failed: {error_msg}")
-
-            return stdout.decode().strip()
-
-        except asyncio.TimeoutError:
-            _LOGGER.error("SSH command timed out after %d seconds", SSH_TIMEOUT * 2)
-            raise Exception("SSH command timed out")
+            return await self.hass.async_add_executor_job(_execute_ssh_command)
         except Exception as err:
-            _LOGGER.error("Error running SSH command '%s': %s", command, err)
+            _LOGGER.error("Failed to execute SSH command: %s", err)
             raise

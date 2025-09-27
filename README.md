@@ -21,7 +21,6 @@ A Home Assistant custom integration that monitors Snapraid array statistics from
 - Snapraid installed and configured on the target server
 - SSH server running on the target machine
 - `sudo` access for the configured user to run snapraid commands
-- `sshpass` utility available on the Home Assistant host
 
 ### Home Assistant Requirements
 - Home Assistant 2023.1 or newer
@@ -163,8 +162,8 @@ automation:
 
 #### Sensor shows "Unavailable"
 - Check Home Assistant logs for detailed error messages
-- Verify `sshpass` is available on the Home Assistant host
 - Ensure SSH connection is stable
+- Verify network connectivity between Home Assistant and target server
 
 ### Enable Debug Logging
 
@@ -179,7 +178,9 @@ logger:
 ## Security Considerations
 
 - SSH credentials are stored securely in Home Assistant's encrypted storage
-- Consider using SSH key authentication instead of passwords when possible
+- Uses paramiko library for secure SSH connections (no external dependencies)
+- SSH connections use proper timeout and error handling
+- Consider using SSH key authentication instead of passwords (future enhancement)
 - Ensure your snapraid server has proper firewall rules
 - Use strong passwords for SSH access
 - Regularly update both Home Assistant and the target server
