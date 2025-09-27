@@ -33,6 +33,7 @@ SENSOR_UNIQUE_ID = "snapraid_stats"
 # States
 STATE_OK = "OK"
 STATE_ERROR = "Error"
+STATE_RUNNING = "Running"
 STATE_UNAVAILABLE = "Unavailable"
 
 # Snapraid commands

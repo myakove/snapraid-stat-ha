@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.11] - 2025-09-27
+
+### Fixed
+- **Critical**: Fixed Python scope error that prevented integration from working
+- Removed duplicate `import re` statement that caused variable scope issues
+- Integration should now properly initialize and collect data
+
+### Added
+- **New Feature**: Added "Running" state when sensor is actively fetching data
+- Sensor now shows "Running" status during data collection operations
+- Better real-time feedback on integration activity
+
+### Enhanced
+- Improved error tracking and state management
+- Better visibility into integration operation status
+
 ## [1.3.10] - 2025-09-27
 
 ### Fixed

@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SnapraidStatsDataUpdateCoordinator
-from .const import CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME, DOMAIN, SENSOR_NAME, SENSOR_UNIQUE_ID, STATE_ERROR, STATE_OK, STATE_UNAVAILABLE
+from .const import CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME, DOMAIN, SENSOR_NAME, SENSOR_UNIQUE_ID, STATE_ERROR, STATE_OK, STATE_RUNNING, STATE_UNAVAILABLE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +62,10 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
     @property
     def native_value(self) -> str:
         """Return the state of the sensor."""
+        # Check if currently updating
+        if hasattr(self.coordinator, '_is_updating') and self.coordinator._is_updating:
+            return STATE_RUNNING
+
         if not self.coordinator.last_update_success:
             return STATE_UNAVAILABLE
 

@@ -90,6 +90,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         self.device_name = entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
         self.snapraid_version = None  # Will be set during first update
         self._consecutive_failures = 0  # Track consecutive failures
+        self._is_updating = False  # Track if currently updating
 
         super().__init__(
             hass,
@@ -101,6 +102,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
     async def _async_update_data(self) -> dict[str, str]:
         """Update data via library."""
         try:
+            self._is_updating = True
             _LOGGER.debug("Starting data update for %s (attempt after %d consecutive failures)",
                          self.host, self._consecutive_failures)
             result = await self._get_snapraid_stats()
@@ -123,6 +125,8 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                              self._consecutive_failures, self.host)
 
             raise UpdateFailed(f"SSH connection failed (attempt #{self._consecutive_failures}): {exception}") from exception
+        finally:
+            self._is_updating = False
 
     async def _get_snapraid_stats(self) -> dict[str, str]:
         """Get snapraid statistics from the remote server."""
@@ -149,7 +153,6 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
                             _LOGGER.debug("Snapraid version output (with sudo): %s", version_output)
 
                         # Parse version from output like "snapraid v12.4 by Andrea Mazzoleni"
-                        import re
                         for line in version_output.strip().splitlines():
                             version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
                             if version_match:
