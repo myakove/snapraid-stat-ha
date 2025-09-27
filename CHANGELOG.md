@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2025-09-27
+
+### Fixed
+- **Critical**: Implement robust two-pass parsing for snapraid diff output
+- First pass finds where statistics section starts by detecting number+keyword patterns
+- Second pass parses only lines that match known statistic keywords (equal, added, removed, etc.)
+- Much more resilient to various output formats and file path variations
+- Focuses exclusively on extracting the 7 core statistics needed for monitoring
+
+### Added
+- Enhanced debug logging showing exact lines being processed and where statistics section starts
+- Better detection of statistics vs file operation lines
+- More selective parsing that ignores non-statistic content
+
+### Changed
+- Replaced simple line filtering with intelligent two-phase parsing
+- Improved handling of verbose snapraid output with many file operations
+
 ## [1.2.5] - 2025-09-27
 
 ### Fixed
