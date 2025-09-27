@@ -18,13 +18,19 @@ from .const import (
     AUTH_TYPE_SSH_KEY,
     CONF_AUTH_TYPE,
     CONF_SSH_KEY,
+    CONF_SUDO_METHOD,
+    CONF_SUDO_PASSWORD,
     DEFAULT_AUTH_TYPE,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SUDO_METHOD,
     DOMAIN,
     SNAPRAID_DIFF_CMD,
     SNAPRAID_STATUS_CMD,
     SSH_COMMAND_TIMEOUT,
     SSH_TIMEOUT,
+    SUDO_METHOD_PASSWORD,
+    SUDO_METHOD_PASSWORDLESS,
+    SUDO_METHOD_SSH_PASSWORD,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -71,6 +77,8 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
         self.auth_type = entry.data.get(CONF_AUTH_TYPE, DEFAULT_AUTH_TYPE)
         self.password = entry.data.get(CONF_PASSWORD)
         self.ssh_key = entry.data.get(CONF_SSH_KEY)
+        self.sudo_method = entry.data.get(CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD)
+        self.sudo_password = entry.data.get(CONF_SUDO_PASSWORD)
         self.port = entry.data[CONF_PORT]
 
         super().__init__(
@@ -184,8 +192,18 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 # Connect with timeout
                 client.connect(**connect_kwargs)
 
-                # Execute command
+                # Execute command with sudo handling
                 stdin, stdout, stderr = client.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
+
+                # Handle sudo password if needed
+                if "sudo" in command and self.sudo_method == SUDO_METHOD_PASSWORD:
+                    stdin.write(f"{self.sudo_password}\n")
+                    stdin.flush()
+                elif "sudo" in command and self.sudo_method == SUDO_METHOD_SSH_PASSWORD:
+                    if self.auth_type == AUTH_TYPE_PASSWORD:
+                        stdin.write(f"{self.password}\n")
+                        stdin.flush()
+
                 exit_status = stdout.channel.recv_exit_status()
 
                 # Read output

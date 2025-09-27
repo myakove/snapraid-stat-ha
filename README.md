@@ -57,6 +57,11 @@ A Home Assistant custom integration that monitors Snapraid array statistics from
    - **Authentication Type**: Choose between "Password" or "SSH Key"
    - **Password**: SSH password (required for password authentication)
    - **SSH Private Key**: SSH private key content (required for SSH key authentication)
+   - **Sudo Method**: How to handle sudo commands for snapraid
+     - **Passwordless**: User has passwordless sudo configured (recommended)
+     - **Password**: Use separate sudo password
+     - **SSH Password**: Use SSH password for sudo
+   - **Sudo Password**: Required if using "Password" sudo method
    - **Port**: SSH port (default: 22)
 
 ### Reconfiguration
@@ -164,9 +169,14 @@ automation:
   - Ensure SSH key authentication is enabled on the server
 
 #### "Command failed" errors
-- Ensure snapraid is installed on the target server
-- Verify the user has sudo access to run snapraid commands
-- Check that snapraid configuration is valid
+- **Snapraid Installation**: Ensure snapraid is installed on the target server
+- **Sudo Access**: Verify the user has sudo access to run snapraid commands
+- **Sudo Configuration**: Check that the selected sudo method is properly configured
+  - For passwordless: Test with `sudo -n snapraid --version`
+  - For password: Verify the sudo password is correct
+  - For SSH password: Ensure SSH and sudo passwords match
+- **Snapraid Config**: Check that snapraid configuration is valid
+- **Permissions**: Verify snapraid executable permissions and location
 
 #### Sensor shows "Unavailable"
 - Check Home Assistant logs for detailed error messages
@@ -220,6 +230,48 @@ For enhanced security, you can use SSH key authentication:
    - Leave password field empty
 
 5. **Test Connection**: The integration will validate the SSH key during setup
+
+### Setting up Sudo Access for Snapraid
+
+Snapraid commands require root privileges. Choose one of these sudo configuration methods:
+
+#### Option 1: Passwordless Sudo (Recommended)
+
+Configure the user to run snapraid commands without a password prompt:
+
+1. **Edit sudoers file**:
+   ```bash
+   sudo visudo
+   ```
+
+2. **Add snapraid-specific rule**:
+   ```bash
+   # Allow user to run snapraid without password
+   username ALL=(root) NOPASSWD: /usr/bin/snapraid
+   ```
+
+3. **Test configuration**:
+   ```bash
+   sudo -n snapraid --version
+   ```
+
+#### Option 2: Sudo with Password
+
+If you prefer to use a sudo password:
+
+1. **Configure Integration**: Set Sudo Method to "Password"
+2. **Enter Sudo Password**: Provide the user's sudo password
+3. **Test**: The integration will test sudo access during setup
+
+#### Option 3: Use SSH Password for Sudo
+
+If the SSH user password is the same as the sudo password:
+
+1. **Configure Integration**: Set Sudo Method to "SSH Password"
+2. **Requirement**: Only works with password-based SSH authentication
+3. **Automatic**: Uses the SSH password for sudo commands
+
+**Security Note**: Passwordless sudo is recommended for automated systems as it's more secure and reliable than storing passwords.
 
 ## Contributing
 

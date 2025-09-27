@@ -10,12 +10,16 @@
           "auth_type": "Authentication Type",
           "password": "Password",
           "ssh_key": "SSH Private Key",
+          "sudo_method": "Sudo Method",
+          "sudo_password": "Sudo Password",
           "port": "Port"
         },
         "data_description": {
           "auth_type": "Choose between password or SSH key authentication",
           "password": "Required for password authentication",
           "ssh_key": "Required for SSH key authentication (paste private key content)",
+          "sudo_method": "How to handle sudo commands for snapraid",
+          "sudo_password": "Required for sudo password authentication",
           "port": "SSH port (default: 22)"
         }
       }
@@ -41,12 +45,16 @@
           "auth_type": "Authentication Type",
           "password": "Password",
           "ssh_key": "SSH Private Key",
+          "sudo_method": "Sudo Method",
+          "sudo_password": "Sudo Password",
           "port": "Port"
         },
         "data_description": {
           "auth_type": "Choose between password or SSH key authentication",
           "password": "Required for password authentication",
           "ssh_key": "Required for SSH key authentication (paste private key content)",
+          "sudo_method": "How to handle sudo commands for snapraid",
+          "sudo_password": "Required for sudo password authentication",
           "port": "SSH port (default: 22)"
         }
       }
