@@ -32,5 +32,6 @@ STATE_UNAVAILABLE = "Unavailable"
 SNAPRAID_STATUS_CMD = "sudo snapraid status"
 SNAPRAID_DIFF_CMD = "sudo snapraid diff"
 
-# SSH timeout
-SSH_TIMEOUT = 30
+# SSH timeouts
+SSH_TIMEOUT = 60  # Increased for better connectivity
+SSH_COMMAND_TIMEOUT = 120  # Longer timeout for snapraid commands

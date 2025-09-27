@@ -23,6 +23,7 @@ from .const import (
     DOMAIN,
     SNAPRAID_DIFF_CMD,
     SNAPRAID_STATUS_CMD,
+    SSH_COMMAND_TIMEOUT,
     SSH_TIMEOUT,
 )
 
@@ -151,27 +152,40 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                 if self.auth_type == AUTH_TYPE_PASSWORD:
                     connect_kwargs["password"] = self.password
                 elif self.auth_type == AUTH_TYPE_SSH_KEY:
-                    # Parse SSH key
-                    try:
-                        key_obj = paramiko.RSAKey.from_private_key(StringIO(self.ssh_key))
-                        connect_kwargs["pkey"] = key_obj
-                    except Exception:
+                    # Parse SSH key - try different key types
+                    key_obj = None
+                    ssh_key_clean = self.ssh_key.strip()
+
+                    # Try different key types
+                    key_types = [
+                        ("Ed25519", paramiko.Ed25519Key),
+                        ("RSA", paramiko.RSAKey),
+                        ("ECDSA", paramiko.ECDSAKey),
+                        ("DSS/DSA", paramiko.DSSKey),
+                    ]
+
+                    last_error = None
+                    for key_type_name, key_class in key_types:
                         try:
-                            key_obj = paramiko.Ed25519Key.from_private_key(StringIO(self.ssh_key))
-                            connect_kwargs["pkey"] = key_obj
-                        except Exception:
-                            try:
-                                key_obj = paramiko.ECDSAKey.from_private_key(StringIO(self.ssh_key))
-                                connect_kwargs["pkey"] = key_obj
-                            except Exception:
-                                key_obj = paramiko.DSSKey.from_private_key(StringIO(self.ssh_key))
-                                connect_kwargs["pkey"] = key_obj
+                            key_obj = key_class.from_private_key(StringIO(ssh_key_clean))
+                            _LOGGER.debug("Successfully parsed %s SSH key", key_type_name)
+                            break
+                        except Exception as err:
+                            last_error = err
+                            continue
+
+                    if key_obj is None:
+                        error_msg = f"Invalid SSH key format. Last error: {last_error}"
+                        _LOGGER.error(error_msg)
+                        raise Exception(error_msg)
+
+                    connect_kwargs["pkey"] = key_obj
 
                 # Connect with timeout
                 client.connect(**connect_kwargs)
 
                 # Execute command
-                stdin, stdout, stderr = client.exec_command(command, timeout=SSH_TIMEOUT * 2)
+                stdin, stdout, stderr = client.exec_command(command, timeout=SSH_COMMAND_TIMEOUT)
                 exit_status = stdout.channel.recv_exit_status()
 
                 # Read output
@@ -187,11 +201,17 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
             except paramiko.AuthenticationException as err:
                 _LOGGER.error("SSH authentication failed: %s", err)
                 raise Exception(f"SSH authentication failed: {err}")
-            except (paramiko.SSHException, socket.error, socket.timeout) as err:
+            except socket.timeout as err:
+                _LOGGER.error("SSH command timed out after %d seconds: %s", SSH_COMMAND_TIMEOUT, err)
+                raise Exception(f"SSH command timed out: {err}")
+            except (paramiko.SSHException, socket.error) as err:
                 _LOGGER.error("SSH connection failed: %s", err)
                 raise Exception(f"SSH connection failed: {err}")
             except Exception as err:
                 _LOGGER.error("Error running SSH command '%s': %s", command, err)
+                # Check if it's an SSH key related error
+                if "SSH key" in str(err) or "private key" in str(err):
+                    raise Exception(f"SSH key error: {err}")
                 raise Exception(f"SSH command failed: {err}")
             finally:
                 if client:

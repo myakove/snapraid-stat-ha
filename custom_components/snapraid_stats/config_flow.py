@@ -23,6 +23,7 @@ from .const import (
     DEFAULT_AUTH_TYPE,
     DEFAULT_PORT,
     DOMAIN,
+    SSH_COMMAND_TIMEOUT,
     SSH_TIMEOUT,
 )
 
@@ -78,21 +79,39 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             if auth_type == AUTH_TYPE_PASSWORD:
                 connect_kwargs["password"] = password
             elif auth_type == AUTH_TYPE_SSH_KEY:
-                # Parse SSH key
-                try:
-                    key_obj = paramiko.RSAKey.from_private_key(StringIO(ssh_key))
-                    connect_kwargs["pkey"] = key_obj
-                except Exception:
+                # Parse SSH key - try different key types
+                key_obj = None
+                ssh_key_clean = ssh_key.strip()
+
+                # Validate key format
+                if not ssh_key_clean:
+                    raise Exception("SSH key cannot be empty")
+
+                # Try different key types
+                key_types = [
+                    ("Ed25519", paramiko.Ed25519Key),
+                    ("RSA", paramiko.RSAKey),
+                    ("ECDSA", paramiko.ECDSAKey),
+                    ("DSS/DSA", paramiko.DSSKey),
+                ]
+
+                last_error = None
+                for key_type_name, key_class in key_types:
                     try:
-                        key_obj = paramiko.Ed25519Key.from_private_key(StringIO(ssh_key))
-                        connect_kwargs["pkey"] = key_obj
-                    except Exception:
-                        try:
-                            key_obj = paramiko.ECDSAKey.from_private_key(StringIO(ssh_key))
-                            connect_kwargs["pkey"] = key_obj
-                        except Exception:
-                            key_obj = paramiko.DSSKey.from_private_key(StringIO(ssh_key))
-                            connect_kwargs["pkey"] = key_obj
+                        key_obj = key_class.from_private_key(StringIO(ssh_key_clean))
+                        _LOGGER.debug("Successfully parsed %s SSH key", key_type_name)
+                        break
+                    except Exception as err:
+                        last_error = err
+                        _LOGGER.debug("Failed to parse as %s key: %s", key_type_name, err)
+                        continue
+
+                if key_obj is None:
+                    error_msg = f"Invalid SSH key format. Last error: {last_error}"
+                    _LOGGER.error(error_msg)
+                    raise Exception(error_msg)
+
+                connect_kwargs["pkey"] = key_obj
 
             # Connect with timeout
             client.connect(**connect_kwargs)
@@ -108,20 +127,27 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
             # Test snapraid command (optional)
             try:
-                stdin, stdout, stderr = client.exec_command("sudo snapraid --version", timeout=SSH_TIMEOUT)
+                stdin, stdout, stderr = client.exec_command("sudo snapraid --version", timeout=SSH_COMMAND_TIMEOUT)
                 exit_status = stdout.channel.recv_exit_status()
                 if exit_status != 0:
                     _LOGGER.warning("Snapraid command test failed, but proceeding: %s", stderr.read().decode())
             except Exception as err:
                 _LOGGER.warning("Could not test snapraid command: %s", err)
 
-        except paramiko.AuthenticationException:
+        except paramiko.AuthenticationException as err:
+            _LOGGER.error("SSH authentication failed: %s", err)
             raise InvalidAuth
-        except (paramiko.SSHException, socket.error, socket.timeout) as err:
+        except socket.timeout as err:
+            _LOGGER.error("SSH connection timed out: %s", err)
+            raise CannotConnect
+        except (paramiko.SSHException, socket.error) as err:
             _LOGGER.error("SSH connection failed: %s", err)
             raise CannotConnect
         except Exception as err:
             _LOGGER.error("Unexpected error during SSH test: %s", err)
+            # Check if it's an SSH key related error
+            if "SSH key" in str(err) or "private key" in str(err):
+                raise InvalidAuth
             raise CannotConnect
         finally:
             if client:
