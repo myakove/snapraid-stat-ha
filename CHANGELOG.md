@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2025-09-27
+
+### Fixed
+- **Critical**: Replace complex parsing with precise regex pattern matching
+- Use regex to match exact snapraid statistics format: `^\s*(\d+)\s+(keyword)$`
+- Directly targets format like "  355067 equal", "     676 added"
+- Automatically ignores all file paths and non-statistic lines
+- Much simpler and more reliable than previous multi-pass parsing
+
+### Changed
+- Simplified parsing logic from 45+ lines to ~15 lines using regex
+- More precise matching that's immune to file operation format variations
+- Enhanced debug logging showing regex matches and statistics found
+
+### Removed
+- Complex two-pass parsing logic
+- Manual line filtering and keyword detection
+- Error-prone string manipulation approaches
+
 ## [1.2.6] - 2025-09-27
 
 ### Fixed
