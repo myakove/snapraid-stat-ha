@@ -14,6 +14,7 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNA
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from .const import (
     AUTH_TYPE_PASSWORD,
@@ -41,7 +42,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_AUTH_TYPE, default=DEFAULT_AUTH_TYPE): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
         vol.Optional(CONF_PASSWORD): str,
-        vol.Optional(CONF_SSH_KEY): vol.All(str, vol.Length(max=8192)),
+        vol.Optional(CONF_SSH_KEY): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)),
         vol.Required(CONF_SUDO_METHOD, default=DEFAULT_SUDO_METHOD): vol.In([
             SUDO_METHOD_PASSWORDLESS,
             SUDO_METHOD_PASSWORD,
@@ -72,6 +73,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         raise Exception("Password is required for password authentication")
     if auth_type == AUTH_TYPE_SSH_KEY and not ssh_key:
         raise Exception("SSH key is required for SSH key authentication")
+    if auth_type == AUTH_TYPE_SSH_KEY and len(ssh_key.strip()) > 8192:
+        raise Exception("SSH key is too long (maximum 8192 characters)")
 
     # Validate sudo parameters
     if sudo_method == SUDO_METHOD_PASSWORD and not sudo_password:
@@ -312,7 +315,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(CONF_USERNAME, default=suggested_values[CONF_USERNAME]): str,
                 vol.Required(CONF_AUTH_TYPE, default=suggested_values[CONF_AUTH_TYPE]): vol.In([AUTH_TYPE_PASSWORD, AUTH_TYPE_SSH_KEY]),
                 vol.Optional(CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]): str,
-                vol.Optional(CONF_SSH_KEY, default=suggested_values[CONF_SSH_KEY]): vol.All(str, vol.Length(max=8192)),
+                vol.Optional(CONF_SSH_KEY, default=suggested_values[CONF_SSH_KEY]): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)),
                 vol.Required(CONF_SUDO_METHOD, default=suggested_values[CONF_SUDO_METHOD]): vol.In([
                     SUDO_METHOD_PASSWORDLESS,
                     SUDO_METHOD_PASSWORD,
