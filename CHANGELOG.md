@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2025-09-27
+
+### Fixed
+- **Critical**: Fixed snapraid output parsing to handle real-world command output
+- Integration initialization failure when snapraid produces valid but differently formatted output
+- Robust keyword-based parsing instead of fragile line-position parsing
+- Support for snapraid diff output containing "There are differences!" message
+
+### Changed
+- Parsing logic now searches for "number keyword" patterns (e.g., "355067 equal")
+- Enhanced debug logging for output parsing diagnostics
+- Fallback values provided when parsing encounters unexpected formats
+- Support for variable output formats from different snapraid configurations
+
+### Added
+- Comprehensive debug logging showing parsed statistics
+- Better error handling for malformed snapraid output
+- Default values for missing status information
+
 ## [1.2.3] - 2025-09-27
 
 ### Added
