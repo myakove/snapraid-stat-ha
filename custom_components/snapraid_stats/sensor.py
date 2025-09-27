@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers import device_registry as dr
 
 from . import SnapraidStatsDataUpdateCoordinator
-from .const import CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME, DOMAIN, SENSOR_NAME, SENSOR_UNIQUE_ID, STATE_ERROR, STATE_OK, STATE_RUNNING, STATE_UNAVAILABLE
+from .const import CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME, DOMAIN, SENSOR_NAME, STATE_ERROR, STATE_OK, STATE_RUNNING, STATE_UNAVAILABLE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
 
         # Use just "Stats" to avoid duplication when device name is "SnapRaid"
         self._attr_name = f"{self._device_name} Stats"
-        # Create stable unique ID based on host and domain for persistence
-        self._attr_unique_id = f"{DOMAIN}_{self._host}_{SENSOR_UNIQUE_ID}"
+        # Create stable unique ID based on config entry ID (canonical)
+        self._attr_unique_id = f"{DOMAIN}_{self._config_entry.entry_id}"
         _LOGGER.info("Setting sensor unique ID: %s", self._attr_unique_id)
         self._attr_icon = "mdi:harddisk"
         # Ensure proper platform identification
