@@ -5,7 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-01-XX
+## [1.2.0] - 2025-09-27
+
+### Added
+- SSH key authentication support (RSA, Ed25519, ECDSA, DSS key types)
+- Comprehensive sudo support for snapraid commands with three methods:
+  - Passwordless sudo (recommended)
+  - Sudo with password
+  - Sudo using SSH password
+- Improved SSH connection timeouts and error handling
+- Better SSH key parsing with support for multiple key formats
+- Enhanced validation during integration setup
+- Comprehensive documentation for SSH key and sudo setup
+
+### Changed
+- Replaced sshpass dependency with paramiko library for better SSH handling
+- Increased SSH timeouts for better reliability (60s connection, 120s commands)
+- Improved error messages and validation feedback
+- Enhanced security with proper SSH key handling
+
+### Fixed
+- HACS installation issues by correcting repository structure
+- SSH connection timeout errors
+- SSH key parsing errors for different key formats
+- Sudo privilege requirements for snapraid commands
+- Connection validation during setup
+
+## [1.0.0] - 2025-09-27
 
 ### Added
 - Initial release of Snapraid Stats Home Assistant integration
