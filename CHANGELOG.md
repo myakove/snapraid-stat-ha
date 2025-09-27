@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.14] - 2025-09-27
+
+### Fixed
+- **Critical**: Removed unnecessary sudo requirement for snapraid version command
+- Version detection now uses `snapraid --version` without sudo (as it should)
+- Enhanced debug logging throughout the integration for better diagnostics
+- Added early integration setup logging to diagnose loading issues
+
+### Changed
+- Simplified version detection logic by removing sudo fallback for version command
+- Improved debug logging levels for better troubleshooting when debug is enabled
+- Enhanced coordinator and sensor initialization with comprehensive debug messages
+
+### Debug
+- Added "SNAPRAID STATS:" prefix to key debug messages for easy identification
+- Comprehensive logging for integration setup, coordinator initialization, and version detection
+- Better tracking of update intervals and data fetch operations
+
 ## [1.3.13] - 2025-09-27
 
 ### Fixed

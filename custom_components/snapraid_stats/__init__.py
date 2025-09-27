@@ -41,6 +41,7 @@ PLATFORMS = ["sensor"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Snapraid Stats from a config entry."""
+    _LOGGER.debug("SNAPRAID STATS: Setting up integration for %s", entry.data.get(CONF_HOST, "unknown"))
     coordinator = SnapraidStatsDataUpdateCoordinator(hass, entry)
 
     await coordinator.async_config_entry_first_refresh()
@@ -92,7 +93,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         self._consecutive_failures = 0  # Track consecutive failures
         self._is_updating = False  # Track if currently updating
 
-        _LOGGER.info("Initializing coordinator for %s with update interval: %d seconds", self.host, self.scan_interval)
+        _LOGGER.debug("SNAPRAID STATS: Initializing coordinator for %s with update interval: %d seconds", self.host, self.scan_interval)
         super().__init__(
             hass,
             _LOGGER,
@@ -104,8 +105,8 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         """Update data via library."""
         try:
             self._is_updating = True
-            _LOGGER.info("Starting scheduled data update for %s (attempt after %d consecutive failures, interval: %ds)",
-                        self.host, self._consecutive_failures, self.scan_interval)
+            _LOGGER.debug("SNAPRAID STATS: Starting scheduled data update for %s (attempt after %d consecutive failures, interval: %ds)",
+                         self.host, self._consecutive_failures, self.scan_interval)
             result = await self._get_snapraid_stats()
             _LOGGER.debug("Data update successful for %s, got %d stats", self.host, len(result))
             # Reset failure counter on success
@@ -142,26 +143,15 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
 
                 # Get snapraid version if we haven't already or if it's still Unknown
                 if self.snapraid_version is None or self.snapraid_version == "Unknown":
-                    _LOGGER.info("Attempting to detect snapraid version on %s", self.host)
+                    _LOGGER.debug("SNAPRAID STATS: Attempting to detect snapraid version on %s", self.host)
                     try:
-                        # Try without sudo first, as version command typically doesn't need root
-                        version_output = None
-                        try:
-                            version_output = await self._run_ssh_command("snapraid --version")
-                            _LOGGER.info("Snapraid version output (no sudo): %s", version_output)
-                        except Exception as no_sudo_err:
-                            _LOGGER.info("Version command failed without sudo: %s, trying with sudo", no_sudo_err)
-                            # If that fails, try with sudo
-                            try:
-                                version_output = await self._run_ssh_command("sudo snapraid --version")
-                                _LOGGER.info("Snapraid version output (with sudo): %s", version_output)
-                            except Exception as sudo_err:
-                                _LOGGER.error("Version command failed with sudo: %s", sudo_err)
-                                raise sudo_err
+                        # Version command should never need sudo
+                        version_output = await self._run_ssh_command("snapraid --version")
+                        _LOGGER.debug("SNAPRAID STATS: Snapraid version output: %s", version_output)
 
                         if version_output:
                             # Parse version from output like "snapraid v12.4 by Andrea Mazzoleni"
-                            _LOGGER.info("Parsing version from output: %s", repr(version_output))
+                            _LOGGER.debug("SNAPRAID STATS: Parsing version from output: %s", repr(version_output))
                             for line in version_output.strip().splitlines():
                                 _LOGGER.debug("Checking line: %s", repr(line))
                                 version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
