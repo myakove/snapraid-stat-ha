@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.8] - 2025-09-27
+
+### Fixed
+- **Critical**: Fixed reload mechanism causing FAILED_UNLOAD state corruption
+- Replaced custom reload function with Home Assistant's built-in reload mechanism
+- Integration now works correctly after HA restart AND during option changes/reloads
+- No more state machine deadlocks when toggling debug logging or changing settings
+
+### Changed
+- Update listener now uses `hass.config_entries.async_reload()` instead of custom reload logic
+- Follows same proven pattern as Frigate and other stable integrations
+- More reliable integration lifecycle management
+
 ## [1.3.7] - 2025-09-27
 
 ### Fixed
