@@ -39,11 +39,15 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
         super().__init__(coordinator)
         self._device_name = config_entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
         self._host = config_entry.data[CONF_HOST]
+        self._config_entry = config_entry
+
         # Use just "Stats" to avoid duplication when device name is "SnapRaid"
         self._attr_name = f"{self._device_name} Stats"
-        # Keep stable unique ID based on config entry to avoid orphaned entities
+        # Keep config-entry based unique ID for stability
         self._attr_unique_id = f"{SENSOR_UNIQUE_ID}_{config_entry.entry_id}"
         self._attr_icon = "mdi:harddisk"
+        # Ensure proper platform identification
+        self._attr_has_entity_name = True
         # Set device info directly to ensure proper association
         # Note: sw_version will be updated with actual snapraid version after first update
         self._attr_device_info = {
@@ -112,3 +116,4 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
     def available(self) -> bool:
         """Return True if entity is available."""
         return self.coordinator.last_update_success
+

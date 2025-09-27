@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2025-09-27
+
+### Fixed
+- **Critical**: Simplified entity registration to resolve persistent "entity no longer being provided" warning
+- Removed complex entity registry manipulation that could cause registration issues
+- Streamlined sensor setup and entity identification
+- Should eliminate the recurring entity warning for users without orphaned entities
+
+### Improved
+- Cleaner entity registration process
+- More reliable entity-integration association
+- Simplified sensor initialization
+
 ## [1.3.3] - 2025-09-27
 
 ### Fixed
