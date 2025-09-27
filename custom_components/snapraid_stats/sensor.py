@@ -45,12 +45,13 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
         self._attr_unique_id = f"{SENSOR_UNIQUE_ID}_{config_entry.entry_id}"
         self._attr_icon = "mdi:harddisk"
         # Set device info directly to ensure proper association
+        # Note: sw_version will be updated with actual snapraid version after first update
         self._attr_device_info = {
             "identifiers": {(DOMAIN, self._host)},
             "name": f"{self._device_name} ({self._host})",
             "manufacturer": "Snapraid",
             "model": "Stats Monitor",
-            "sw_version": "1.3.0",
+            "sw_version": "Unknown",
         }
 
 
@@ -62,6 +63,16 @@ class SnapraidStatsSensor(CoordinatorEntity[SnapraidStatsDataUpdateCoordinator],
 
         if not self.coordinator.data:
             return STATE_UNAVAILABLE
+
+        # Update device info with snapraid version if available
+        if (hasattr(self.coordinator, 'snapraid_version') and
+            self.coordinator.snapraid_version and
+            self.coordinator.snapraid_version != "Unknown" and
+            self._attr_device_info.get("sw_version") != self.coordinator.snapraid_version):
+
+            self._attr_device_info["sw_version"] = self.coordinator.snapraid_version
+            # Update the device registry
+            self.async_write_ha_state()
 
         # Check if there are any errors in the snapraid output
         errors = self.coordinator.data.get("errors", "")

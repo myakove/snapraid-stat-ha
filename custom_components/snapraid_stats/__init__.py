@@ -82,6 +82,7 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         self.scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         self.debug_logging = entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING)
         self.device_name = entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
+        self.snapraid_version = None  # Will be set during first update
 
         super().__init__(
             hass,
@@ -104,13 +105,38 @@ class SnapraidStatsDataUpdateCoordinator(TimestampDataUpdateCoordinator):
         stats = {}
 
         try:
-            # First check if snapraid is available
+            # First check if snapraid is available and get version
             try:
                 await self._run_ssh_command("which snapraid")
                 if self.debug_logging:
                     _LOGGER.debug("Snapraid found on remote system")
+
+                # Get snapraid version if we haven't already
+                if self.snapraid_version is None:
+                    try:
+                        version_output = await self._run_ssh_command("sudo snapraid --version")
+                        # Parse version from output like "snapraid v12.0 by Andrea Mazzoleni"
+                        for line in version_output.strip().splitlines():
+                            if "snapraid v" in line.lower():
+                                # Extract version number
+                                import re
+                                version_match = re.search(r'snapraid v([\d\.]+)', line, re.IGNORECASE)
+                                if version_match:
+                                    self.snapraid_version = version_match.group(1)
+                                    if self.debug_logging:
+                                        _LOGGER.debug("Detected snapraid version: %s", self.snapraid_version)
+                                    break
+                        if self.snapraid_version is None:
+                            self.snapraid_version = "Unknown"
+                    except Exception as ver_err:
+                        if self.debug_logging:
+                            _LOGGER.debug("Could not get snapraid version: %s", ver_err)
+                        self.snapraid_version = "Unknown"
+
             except Exception as err:
                 _LOGGER.warning("Snapraid command may not be available: %s", err)
+                if self.snapraid_version is None:
+                    self.snapraid_version = "Unknown"
 
             # Get status information
             status_output = await self._run_ssh_command(SNAPRAID_STATUS_CMD)
