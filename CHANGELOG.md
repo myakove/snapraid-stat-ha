@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.9] - 2025-09-27
+
+### Changed
+- **User Request**: Reduced scan interval minimum from 300 seconds (5 minutes) to 30 seconds
+- Users can now set scan intervals as low as 30 seconds for more frequent monitoring
+- Allows 60-second intervals and other faster polling frequencies
+- Maximum remains 86400 seconds (24 hours)
+
+### Improved
+- More flexible polling frequency options
+- Better support for high-frequency monitoring use cases
+
 ## [1.3.8] - 2025-09-27
 
 ### Fixed

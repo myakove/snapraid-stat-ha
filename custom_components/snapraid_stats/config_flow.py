@@ -49,7 +49,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         ]),
         vol.Optional(CONF_SUDO_PASSWORD): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=300, max=86400)),
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
         vol.Optional(CONF_DEBUG_LOGGING, default=DEFAULT_DEBUG_LOGGING): bool,
         vol.Optional(CONF_DEVICE_NAME, default=DEFAULT_DEVICE_NAME): str,
     }
@@ -280,7 +280,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ]),
                 vol.Optional(CONF_SUDO_PASSWORD, default=suggested_values[CONF_SUDO_PASSWORD]): str,
                 vol.Optional(CONF_PORT, default=suggested_values[CONF_PORT]): int,
-                vol.Optional(CONF_SCAN_INTERVAL, default=suggested_values[CONF_SCAN_INTERVAL]): vol.All(vol.Coerce(int), vol.Range(min=300, max=86400)),
+                vol.Optional(CONF_SCAN_INTERVAL, default=suggested_values[CONF_SCAN_INTERVAL]): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
                 vol.Optional(CONF_DEBUG_LOGGING, default=suggested_values[CONF_DEBUG_LOGGING]): bool,
                 vol.Optional(CONF_DEVICE_NAME, default=suggested_values[CONF_DEVICE_NAME]): str,
             }
