@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2025-09-27
+
+### Fixed
+- **Critical**: Fixed integration reload/unload errors when enabling debug logging
+- Improved error handling in setup and unload processes
+- Added defensive cleanup in case of setup failures
+- Resolved "Config entry was never loaded!" errors during reload
+- Better handling of platform unload failures
+
+### Improved
+- More robust integration lifecycle management
+- Enhanced error logging and recovery
+- Safer data cleanup during unload operations
+
 ## [1.3.5] - 2025-09-27
 
 ### Fixed

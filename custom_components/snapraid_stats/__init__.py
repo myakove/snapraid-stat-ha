@@ -41,30 +41,45 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Snapraid Stats from a config entry."""
-    coordinator = SnapraidStatsDataUpdateCoordinator(hass, entry)
+    try:
+        coordinator = SnapraidStatsDataUpdateCoordinator(hass, entry)
 
-    await coordinator.async_config_entry_first_refresh()
+        await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+        entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
-    return True
+        return True
+    except Exception as err:
+        _LOGGER.error("Error setting up Snapraid Stats integration: %s", err)
+        # Clean up if setup failed
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+        raise
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+    try:
+        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    except Exception as err:
+        _LOGGER.warning("Error unloading platforms for entry %s: %s", entry.entry_id, err)
+        unload_ok = False
+
+    # Always try to clean up data, even if platform unload failed
+    hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
 
     return unload_ok
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry."""
-    await async_unload_entry(hass, entry)
+    unload_result = await async_unload_entry(hass, entry)
+    if not unload_result:
+        _LOGGER.warning("Failed to unload entry %s, proceeding with setup anyway", entry.entry_id)
+
     await async_setup_entry(hass, entry)
 
 
