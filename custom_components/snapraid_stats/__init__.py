@@ -148,10 +148,18 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                     "moved": "0", "copied": "0", "restored": "0"
                 }
 
+                skipped_lines = 0
+
                 for line in diff_lines:
                     line = line.strip()
                     if not line:
                         continue
+
+                    # Skip individual file operations (add/remove specific files)
+                    if line.startswith(('add ', 'remove ', 'update ', 'move ', 'copy ', 'restore ')):
+                        skipped_lines += 1
+                        continue
+
                     parts = line.split()
                     if len(parts) >= 2:
                         try:
@@ -163,6 +171,7 @@ class SnapraidStatsDataUpdateCoordinator(DataUpdateCoordinator):
                         except (ValueError, IndexError):
                             continue
 
+                _LOGGER.debug("Skipped %d file operation lines, parsed statistics: %s", skipped_lines, stats_dict)
                 stats.update(stats_dict)
 
         except Exception as err:
