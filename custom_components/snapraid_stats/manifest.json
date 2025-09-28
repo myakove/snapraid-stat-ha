@@ -8,7 +8,7 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/myakove/snapraid-stat-ha/issues",
   "requirements": ["paramiko>=2.7.0"],
-  "version": "1.3.21",
+  "version": "1.3.22",
   "dependencies": [],
   "after_dependencies": []
 }
