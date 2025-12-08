@@ -1,10 +1,9 @@
 """Config flow for Snapraid Stats integration."""
+
 from __future__ import annotations
 
-import asyncio
 import logging
 import socket
-from io import StringIO
 from typing import Any
 
 import paramiko
@@ -14,7 +13,6 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNA
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import selector
 
 from .const import (
     CONF_DEBUG_LOGGING,
@@ -42,14 +40,14 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Required(CONF_SUDO_METHOD, default=DEFAULT_SUDO_METHOD): vol.In([
-            SUDO_METHOD_PASSWORDLESS,
-            SUDO_METHOD_PASSWORD,
-            SUDO_METHOD_SSH_PASSWORD
-        ]),
+        vol.Required(CONF_SUDO_METHOD, default=DEFAULT_SUDO_METHOD): vol.In(
+            [SUDO_METHOD_PASSWORDLESS, SUDO_METHOD_PASSWORD, SUDO_METHOD_SSH_PASSWORD]
+        ),
         vol.Optional(CONF_SUDO_PASSWORD): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
+            vol.Coerce(int), vol.Range(min=30, max=86400)
+        ),
         vol.Optional(CONF_DEBUG_LOGGING, default=DEFAULT_DEBUG_LOGGING): bool,
         vol.Optional(CONF_DEVICE_NAME, default=DEFAULT_DEVICE_NAME): str,
     }
@@ -99,7 +97,9 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             client.connect(**connect_kwargs)
 
             # Test basic command
-            stdin, stdout, stderr = client.exec_command("echo test", timeout=SSH_TIMEOUT)
+            stdin, stdout, stderr = client.exec_command(
+                "echo test", timeout=SSH_TIMEOUT
+            )
             exit_status = stdout.channel.recv_exit_status()
 
             if exit_status != 0:
@@ -111,35 +111,55 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             try:
                 if sudo_method == SUDO_METHOD_PASSWORDLESS:
                     # Test passwordless sudo
-                    stdin, stdout, stderr = client.exec_command("sudo -n true", timeout=SSH_COMMAND_TIMEOUT)
+                    stdin, stdout, stderr = client.exec_command(
+                        "sudo -n true", timeout=SSH_COMMAND_TIMEOUT
+                    )
                     exit_status = stdout.channel.recv_exit_status()
                     if exit_status != 0:
-                        _LOGGER.warning("Passwordless sudo not configured. Error: %s", stderr.read().decode())
-                        raise Exception("Passwordless sudo is not configured for this user")
+                        _LOGGER.warning(
+                            "Passwordless sudo not configured. Error: %s",
+                            stderr.read().decode(),
+                        )
+                        raise Exception(
+                            "Passwordless sudo is not configured for this user"
+                        )
 
                 elif sudo_method == SUDO_METHOD_PASSWORD:
                     # Test sudo with password
-                    stdin, stdout, stderr = client.exec_command("sudo -S true", timeout=SSH_COMMAND_TIMEOUT)
+                    stdin, stdout, stderr = client.exec_command(
+                        "sudo -S true", timeout=SSH_COMMAND_TIMEOUT
+                    )
                     stdin.write(f"{sudo_password}\n")
                     stdin.flush()
                     exit_status = stdout.channel.recv_exit_status()
                     if exit_status != 0:
-                        _LOGGER.error("Sudo password authentication failed: %s", stderr.read().decode())
+                        _LOGGER.error(
+                            "Sudo password authentication failed: %s",
+                            stderr.read().decode(),
+                        )
                         raise Exception("Sudo password authentication failed")
 
                 elif sudo_method == SUDO_METHOD_SSH_PASSWORD:
                     # Test sudo with SSH password
-                    stdin, stdout, stderr = client.exec_command("sudo -S true", timeout=SSH_COMMAND_TIMEOUT)
+                    stdin, stdout, stderr = client.exec_command(
+                        "sudo -S true", timeout=SSH_COMMAND_TIMEOUT
+                    )
                     stdin.write(f"{password}\n")
                     stdin.flush()
                     exit_status = stdout.channel.recv_exit_status()
                     if exit_status != 0:
-                        _LOGGER.error("Sudo with SSH password failed: %s", stderr.read().decode())
+                        _LOGGER.error(
+                            "Sudo with SSH password failed: %s", stderr.read().decode()
+                        )
                         raise Exception("Sudo with SSH password failed")
 
                 # Test snapraid command if sudo works
-                _LOGGER.debug("Testing snapraid command with sudo method: %s", sudo_method)
-                stdin, stdout, stderr = client.exec_command("sudo snapraid --version", timeout=SSH_COMMAND_TIMEOUT)
+                _LOGGER.debug(
+                    "Testing snapraid command with sudo method: %s", sudo_method
+                )
+                stdin, stdout, stderr = client.exec_command(
+                    "sudo snapraid --version", timeout=SSH_COMMAND_TIMEOUT
+                )
                 if sudo_method == SUDO_METHOD_PASSWORD:
                     stdin.write(f"{sudo_password}\n")
                     stdin.flush()
@@ -149,7 +169,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
                 exit_status = stdout.channel.recv_exit_status()
                 if exit_status != 0:
-                    _LOGGER.warning("Snapraid command test failed, but proceeding: %s", stderr.read().decode())
+                    _LOGGER.warning(
+                        "Snapraid command test failed, but proceeding: %s",
+                        stderr.read().decode(),
+                    )
 
             except Exception as err:
                 _LOGGER.error("Sudo/Snapraid test failed: %s", err)
@@ -228,10 +251,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Snapraid Stats."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -260,29 +279,53 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             CONF_HOST: self.config_entry.data.get(CONF_HOST, ""),
             CONF_USERNAME: self.config_entry.data.get(CONF_USERNAME, ""),
             CONF_PASSWORD: self.config_entry.data.get(CONF_PASSWORD, ""),
-            CONF_SUDO_METHOD: self.config_entry.data.get(CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD),
+            CONF_SUDO_METHOD: self.config_entry.data.get(
+                CONF_SUDO_METHOD, DEFAULT_SUDO_METHOD
+            ),
             CONF_SUDO_PASSWORD: self.config_entry.data.get(CONF_SUDO_PASSWORD, ""),
             CONF_PORT: self.config_entry.data.get(CONF_PORT, DEFAULT_PORT),
-            CONF_SCAN_INTERVAL: self.config_entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-            CONF_DEBUG_LOGGING: self.config_entry.data.get(CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING),
-            CONF_DEVICE_NAME: self.config_entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME),
+            CONF_SCAN_INTERVAL: self.config_entry.data.get(
+                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+            ),
+            CONF_DEBUG_LOGGING: self.config_entry.data.get(
+                CONF_DEBUG_LOGGING, DEFAULT_DEBUG_LOGGING
+            ),
+            CONF_DEVICE_NAME: self.config_entry.data.get(
+                CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME
+            ),
         }
 
         options_schema = vol.Schema(
             {
                 vol.Required(CONF_HOST, default=suggested_values[CONF_HOST]): str,
-                vol.Required(CONF_USERNAME, default=suggested_values[CONF_USERNAME]): str,
-                vol.Required(CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]): str,
-                vol.Required(CONF_SUDO_METHOD, default=suggested_values[CONF_SUDO_METHOD]): vol.In([
-                    SUDO_METHOD_PASSWORDLESS,
-                    SUDO_METHOD_PASSWORD,
-                    SUDO_METHOD_SSH_PASSWORD
-                ]),
-                vol.Optional(CONF_SUDO_PASSWORD, default=suggested_values[CONF_SUDO_PASSWORD]): str,
+                vol.Required(
+                    CONF_USERNAME, default=suggested_values[CONF_USERNAME]
+                ): str,
+                vol.Required(
+                    CONF_PASSWORD, default=suggested_values[CONF_PASSWORD]
+                ): str,
+                vol.Required(
+                    CONF_SUDO_METHOD, default=suggested_values[CONF_SUDO_METHOD]
+                ): vol.In(
+                    [
+                        SUDO_METHOD_PASSWORDLESS,
+                        SUDO_METHOD_PASSWORD,
+                        SUDO_METHOD_SSH_PASSWORD,
+                    ]
+                ),
+                vol.Optional(
+                    CONF_SUDO_PASSWORD, default=suggested_values[CONF_SUDO_PASSWORD]
+                ): str,
                 vol.Optional(CONF_PORT, default=suggested_values[CONF_PORT]): int,
-                vol.Optional(CONF_SCAN_INTERVAL, default=suggested_values[CONF_SCAN_INTERVAL]): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
-                vol.Optional(CONF_DEBUG_LOGGING, default=suggested_values[CONF_DEBUG_LOGGING]): bool,
-                vol.Optional(CONF_DEVICE_NAME, default=suggested_values[CONF_DEVICE_NAME]): str,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL, default=suggested_values[CONF_SCAN_INTERVAL]
+                ): vol.All(vol.Coerce(int), vol.Range(min=30, max=86400)),
+                vol.Optional(
+                    CONF_DEBUG_LOGGING, default=suggested_values[CONF_DEBUG_LOGGING]
+                ): bool,
+                vol.Optional(
+                    CONF_DEVICE_NAME, default=suggested_values[CONF_DEVICE_NAME]
+                ): str,
             }
         )
 
@@ -297,3 +340,4 @@ class CannotConnect(HomeAssistantError):
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""
+
