@@ -13,7 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, TimestampDataUpdateCoordinator, UpdateFailed
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
 
 from .const import (
@@ -55,11 +55,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception:  # best-effort; logging config can vary
         pass
 
-    # Perform initial refresh but do not fail setup if it temporarily fails
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except ConfigEntryNotReady as err:
-        _LOGGER.warning("Initial data refresh failed: %s. Proceeding with setup; sensor will be Unavailable until next refresh.", err)
+    # Schedule initial refresh to run after setup completes to avoid blocking HA bootstrap
+    # The sensor will start as "Unavailable" until the first successful refresh
+    async def _async_first_refresh():
+        """Perform first refresh without blocking setup."""
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except ConfigEntryAuthFailed as err:
+            _LOGGER.error(
+                "Authentication failed for %s: %s. Check credentials and reload integration.",
+                entry.data.get(CONF_HOST, "unknown"),
+                err
+            )
+        except Exception as err:
+            _LOGGER.warning(
+                "Initial data refresh failed for %s: %s. Sensor will remain Unavailable until next refresh.",
+                entry.data.get(CONF_HOST, "unknown"),
+                err
+            )
+
+    # Schedule refresh as background task to prevent blocking HA boot
+    # Using async_create_background_task for better lifecycle management (auto-cancels on unload)
+    entry.async_create_background_task(
+        hass, _async_first_refresh(), "snapraid_stats_initial_refresh"
+    )
 
     # Entity registry migration: normalize unique_id to include domain prefix and remove duplicates
     try:
